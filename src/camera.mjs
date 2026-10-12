@@ -42,8 +42,9 @@ export class MovementCamera {
         if(generation!==this.generation)return;
         if(data.type==='error'){this.stop('Camera processing stopped. Try enabling it again, or continue without it.');return;}
         if(data.type==='ready'){
+          if(this.stage!=='loading')return;
           clearTimeout(this.loadTimeout);this.stage='uncalibrated';this.message='';
-          this.interval=setInterval(()=>this.capture(),200);this.notify();return;
+          this.interval=setInterval(()=>this.capture(),200);this.beginCalibration();return;
         }
         if(data.type==='sample'){
           this.inFlight=false;
@@ -61,7 +62,7 @@ export class MovementCamera {
   }
   beginCalibration(){
     if(!['uncalibrated','ready'].includes(this.stage))return;
-    this.token++;this.baseline=null;this.summary=null;this.expressionSummary=null;this.liveExpression=null;this.liveScore=null;this.calibrationFrames=[];this.calibrationStart=null;this.progress=0;
+    this.token++;this.baseline=null;this.summary=null;this.expressionSummary=null;this.liveExpression=null;this.liveScore=null;this.calibrationFrames=[];this.calibrationStart=null;this.calibrationLast=null;this.progress=0;
     this.stage='calibrating';this.message='Rest comfortably and look at the camera (~6 seconds). Timer paused.';this.notify();
   }
   async capture(){
@@ -89,8 +90,8 @@ export class MovementCamera {
       this.message='Rest comfortably and look at the camera (~6 seconds). Timer paused.';
       if(this.calibrationFrames.length>=CALIBRATION_SAMPLES&&at-this.calibrationStart>=5000){
         try{this.baseline=calibrate(this.calibrationFrames,crypto.randomUUID());this.stage='ready';this.message='';}
-        catch(error){this.stage='uncalibrated';this.message=error.message;}
-        this.calibrationFrames=[];this.calibrationStart=null;this.notify();return;
+        catch{this.progress=0;this.message='Rest comfortably and look at the camera. Calibration is restarting automatically. Timer paused.';}
+        this.calibrationFrames=[];this.calibrationStart=null;this.calibrationLast=null;this.notify();return;
       }
     }else if(this.stage==='ready'&&this.key){
       this.summary??=new MovementSummary(this.baseline);

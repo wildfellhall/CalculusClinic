@@ -28,14 +28,16 @@ try{
   assert.ok(await run('(await navigator.mediaDevices.enumerateDevices()).some(d=>d.kind==="videoinput"&&d.label.startsWith("fake_device"))'),'This test requires Chrome fake media devices; never run it against a real camera.');
   await click('[data-view="settings"]');await waitFor('document.querySelector("#camera-access-state").textContent==="On during practice"');assert.equal(await run('qaMediaCalls'),0,'Remembered permission needs no request on the home or settings page');
   await click('[data-view="practice"]');await change('#practice-concept','1.11');await click('[data-action="start-picked"]');
-  await waitFor('!document.querySelector("#camera-calibrate").hidden');assert.equal(await run('qaMediaCalls'),1);assert.equal(await run('document.querySelector("#optional-observations").open'),true);
+  await waitFor('document.querySelector("#camera-state").textContent==="Calibrating"');assert.equal(await run('qaMediaCalls'),1);assert.equal(await run('document.querySelector("#optional-observations").open'),true);
+  assert.equal(await run('document.querySelector("#camera-calibrate").hidden'),true,'Initial calibration needs no button press');
+  assert.equal(await run('document.querySelector("#timer-status").textContent'),'Paused');
   await click('.checkin-optional>summary');
   await change('#checkin-emotion','frustration');await change('#checkin-intensity','4');await change('#checkin-valence','unpleasant');
   assert.ok(await run('document.querySelector("#checkin-score").textContent.includes("−80")||document.querySelector("#checkin-score").textContent.includes("-80")'));
   await click('.checkin-optional>summary');
   // The real, local model processes the fake camera feed (a generated test pattern).
   assert.equal(await run('qaMediaCalls'),1);assert.equal(await run('qaStream.getAudioTracks().length'),0);
-  await click('#camera-calibrate');await waitFor('document.querySelector("#camera-status").textContent.includes("No usable face")');
+  await waitFor('document.querySelector("#camera-status").textContent.includes("No usable face")');
   assert.equal(await run('document.querySelector("#timer-status").textContent'),'Paused');
   await click('#camera-stop');assert.equal(await run('qaStream.getTracks().every(t=>t.readyState==="ended")'),true);
   // Use explicit coefficient fixtures for deterministic calibration/scoring tests.
@@ -45,8 +47,15 @@ try{
     postMessage(data){if(data.type==='init'){setTimeout(()=>this.onmessage?.({data:{type:'ready'}}),10);return;}data.frame.close();const values=qaMode==='face'?Object.fromEntries(qaModel.METRICS.map(m=>[m.id,qaValue])):null;const expressions=Object.fromEntries(['neutral','happy','sad','angry','fearful','disgusted','surprised'].map(k=>[k,k===qaExpressionKey?qaExpressionConfidence:(1-qaExpressionConfidence)/6]));const reason=qaMode==='multiple'?'multiple-faces':'no-face';setTimeout(()=>{if(!this.ended)this.onmessage?.({data:{type:'sample',token:data.token,at:data.at,values,expressions,reason}})},qaDelay);}
     terminate(){this.ended=true}
   };`);
-  await click('#camera-enable');await waitFor('!document.querySelector("#camera-calibrate").hidden');await click('#camera-calibrate');
+  await click('#camera-enable');await waitFor('document.querySelector("#camera-state").textContent==="Calibrating"');
+  const calibrationTime=await run('document.querySelector("#question-timer").dataset.durationMs');
+  await new Promise(r=>setTimeout(r,650));
+  assert.equal(await run('document.querySelector("#question-timer").dataset.durationMs'),calibrationTime,'Automatic calibration does not count toward answer time');
+  assert.deepEqual(await stored(),[],'Calibration is never saved as answer evidence');
+  await run('document.querySelector("#optional-observations").scrollIntoView({block:"start"})');await snap('automatic-calibration');
   await waitFor('document.querySelector("#camera-state").textContent==="Camera on"');
+  assert.equal(await run('document.querySelector("#timer-status").textContent'),'Active time');
+  assert.equal(await run('document.querySelector("#camera-calibrate").textContent'),'Recalibrate resting face');
   await run('window.qaValue=.6');await new Promise(r=>setTimeout(r,1200));
   await run('document.querySelector("#optional-observations").scrollIntoView({block:"start"})');await snap('observations-desktop');
   await click('.answer-options input');await click('[data-action="submit"]');
@@ -90,5 +99,5 @@ try{
   assert.equal(await run('JSON.parse(localStorage.getItem("calculus-clinic-camera-v1")).enabled'),false,'Restoring practice must never restore camera access');
   await click('[data-action="delete-data"]');await click('[data-action="confirm-delete"]');assert.deepEqual(await stored(),[]);
   assert.deepEqual(errors,[]);assert.equal(requests.filter(u=>/^https?:/.test(u)&&!u.startsWith(qaURL+'/')).length,0);
-  console.log('Browser observations passed: first-entry request, remembered automatic camera start, local real-model/no-face processing, calibration, saved scores, missing/multiple faces, feedback boundaries, Settings revocation and persistence, camera release, permission denial/race, exports, restore/delete and mobile layout.');
+  console.log('Browser observations passed: first-entry request, remembered automatic camera start and resting-face calibration, paused setup timer, manual recalibration, local real-model/no-face processing, saved scores, missing/multiple faces, feedback boundaries, Settings revocation and persistence, camera release, permission denial/race, exports, restore/delete and mobile layout.');
 }finally{ws.close();}
