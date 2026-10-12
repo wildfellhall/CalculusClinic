@@ -1,0 +1,31 @@
+import {mkdir,readFile,writeFile,cp} from 'node:fs/promises';
+import {concepts,relationships,units,sources} from '../data/curriculum.mjs';
+import {questions,BANK_VERSION,COMPATIBLE_BANK_VERSIONS} from '../data/questions.mjs';
+import {csv,topologicalOrder} from '../src/core.mjs';
+import {graphLayout,drawGraph} from '../src/graph.mjs';
+import {compileMathText} from './math-format.mjs';
+topologicalOrder(concepts,relationships);
+for(const c of concepts){
+  const count=questions.filter(q=>q.conceptId===c.id).length;
+  if(count<10||count>15)throw new Error(`Expected 10–15 questions for ${c.id}, received ${count}`);
+}
+await mkdir('dist/data',{recursive:true});
+await mkdir('dist/src',{recursive:true});
+const metadata={schemaVersion:'1.0.0',bankVersion:BANK_VERSION,compatibleBankVersions:COMPATIBLE_BANK_VERSIONS,updated:'2026-10-11',granularity:'AP topic-level concept groups with explicit subskills',questionCount:questions.length,conceptCount:concepts.length,scope:'All 111 AP Calculus BC topic references plus 16 prerequisite skill groups',edgeDirection:'prerequisite → dependent',dependencyStatus:'Author-designed teaching model, not an official College Board sequence',assessmentStatus:'Original practice bank; not psychometrically calibrated; accuracy is descriptive, not a mastery diagnosis'};
+const bundle={metadata,units,concepts,relationships,questions,sources};
+await writeFile('dist/data/ontology.json',JSON.stringify(bundle,null,2));
+await writeFile('dist/data/bundle.js','window.CALCULUS_DATA='+JSON.stringify({...bundle,mathText:compileMathText(concepts,questions)}).replaceAll('<','\\u003c')+';\n');
+const nodes=concepts.map(c=>({...c,unitTitle:units[c.unit].title,dependents:relationships.filter(e=>e.type==='prerequisite'&&e.source===c.id).map(e=>e.target),sourceUrl:c.unit?sources[0].url:'',questionIds:questions.filter(q=>q.conceptId===c.id).map(q=>q.id)}));
+await writeFile('dist/data/concepts.csv',csv(nodes,['id','title','unit','unitTitle','scope','cedTopic','objective','subskills','rule','prerequisites','dependents','misconception','firstStep','potentialFriction','support','representations','practices','questionIds','sourceIds','sourceUrl']));
+await writeFile('dist/data/relationships.csv',csv(relationships,['source','target','type','rationale','provenance','requiredFor']));
+await writeFile('dist/data/questions.csv',csv(questions.map(q=>({...q,optionA:q.options[0].text,optionAId:q.options[0].id,optionB:q.options[1].text,optionBId:q.options[1].id,optionC:q.options[2].text,optionCId:q.options[2].id,correctAnswer:q.options.find(o=>o.id===q.correctOptionId).text})),['id','conceptId','version','prompt','optionAId','optionA','optionBId','optionB','optionCId','optionC','correctOptionId','correctAnswer','explanation','format','authorship','validation']));
+await writeFile('dist/data/concept-map.svg',drawGraph(graphLayout(concepts,relationships),units,{standalone:true}));
+const coverage=units.filter(u=>u.id).flatMap(u=>concepts.filter(c=>c.unit===u.id).map(c=>({cedTopic:c.cedTopic,conceptId:c.id,scope:c.scope,questionCount:questions.filter(q=>q.conceptId===c.id).length})));
+await writeFile('dist/data/coverage.csv',csv(coverage,['cedTopic','conceptId','scope','questionCount']));
+for(const file of ['app.mjs','core.mjs','graph.mjs','diagnostic.mjs','timing.mjs','math.mjs'])await cp('src/'+file,'dist/src/'+file);
+for(const file of ['index.html','styles.css'])await cp('src/'+file,'dist/'+file);
+await cp('public','dist',{recursive:true});
+await mkdir('dist/vendor/katex',{recursive:true});
+for(const file of ['katex.mjs','katex.min.css','fonts'])await cp('node_modules/katex/dist/'+file,'dist/vendor/katex/'+file,{recursive:true});
+await cp('node_modules/katex/LICENSE','dist/vendor/katex/LICENSE');
+console.log(`Built ${concepts.length} concepts, ${relationships.length} typed relationships, ${questions.length} questions. All 111 CED topic references covered.`);
