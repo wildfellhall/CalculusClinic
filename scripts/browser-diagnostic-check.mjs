@@ -17,12 +17,12 @@ const waitFor=async expression=>{for(let i=0;i<60;i++){if(await run(expression))
 const click=selector=>run(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw new Error('Missing element: '+${JSON.stringify(selector)});el.click();return true})()`);
 const change=(selector,value)=>run(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 const assertMastery=async(id,score)=>{
-  const node=await run(`(()=>{const n=document.querySelector('.graph-node[data-concept="${id}"]');return n?{score:n.dataset.mastery,fill:n.querySelector('.node-card').getAttribute('fill'),text:n.querySelector('.node-mastery').textContent,label:n.getAttribute('aria-label')}:null})()`);
+  const node=await run(`(()=>{const n=document.querySelector('.graph-node[data-concept="${id}"]');return n?{score:n.dataset.fillScore,fill:n.querySelector('.node-card').getAttribute('fill'),text:n.querySelector('.node-mastery').textContent,label:n.getAttribute('aria-label')}:null})()`);
   assert.ok(node,`Graph node ${id} exists`);
-  assert.equal(node.score,score===null?'unpracticed':String(Math.round(score*100)));
+  assert.equal(node.score,score===null?'unscored':String(Math.round(score*100)));
   assert.equal(node.fill,masteryFill(score));
   assert.ok(node.text.includes(score===null?'Not tried':`${Math.round(score*100)}%`));
-  assert.ok(node.label.includes(score===null?'Not tried':'Practice mastery'));
+  assert.ok(node.label.includes(score===null?'No answers recorded':'Accuracy fill'));
 };
 const shot=async(name)=>{await run('document.fonts.ready');const result=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(`test-results/${name}.png`,Buffer.from(result.data,'base64'));};
 await mkdir('test-results',{recursive:true});

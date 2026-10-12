@@ -4,7 +4,7 @@ import {resolve,extname,sep} from 'node:path';
 import {execFileSync} from 'node:child_process';
 execFileSync(process.execPath,['scripts/build.mjs'],{stdio:'inherit'});
 const root=resolve('dist'),port=Number(process.env.PORT||3000);
-const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.csv':'text/csv; charset=utf-8','.woff2':'font/woff2','.ttf':'font/ttf'};
+const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.csv':'text/csv; charset=utf-8','.woff2':'font/woff2','.ttf':'font/ttf','.wasm':'application/wasm','.task':'application/octet-stream'};
 const server=http.createServer(async(req,res)=>{
   try{
     const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);

@@ -19,7 +19,7 @@ export function diagnosticState({concepts,relationships,questions,attempts,cours
   for(const c of eligible){
     const history=records.get(c.id).sort(chronology),s=stats(history,itemIds.get(c.id));
     // Keep the agreed pass rule about answers, independent of the small timing
-    // adjustment used to shade the graph.
+    // adjustment retained in the exported practice-mastery score.
     const status=!s.attempted?'unseen':s.attempted<s.available?'partial':s.correctnessScore>=passThreshold?'passed':'review';
     nodes.set(c.id,{...s,status,lastAttempt:history.at(-1)??null});
   }

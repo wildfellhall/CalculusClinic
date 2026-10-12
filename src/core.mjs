@@ -1,10 +1,12 @@
 import {timedCredit,validDuration} from './timing.mjs';
+import {validateSelfReport,validateMovement} from './observations.mjs';
+import {validateExpression} from './expressions.mjs';
 export const STORAGE_KEY='calculus-clinic-progress-v1';
 export function csv(rows,columns){
   const escape=value=>{
     let s=Array.isArray(value)?value.join('; '):String(value??'');
     // Keep spreadsheet applications from interpreting imported text as formulas.
-    if(/^[=+@\-\t\r]/.test(s)) s="'"+s;
+    if(!(typeof value==='number'&&Number.isFinite(value))&&/^[=+@\-\t\r]/.test(s)) s="'"+s;
     return '"'+s.replaceAll('"','""')+'"';
   };
   return '\uFEFF'+[columns.map(escape).join(','),...rows.map(row=>columns.map(k=>escape(row[k])).join(','))].join('\r\n');
@@ -36,7 +38,7 @@ export function validateAttempts(value,questions){
     if(!q||q.conceptId!==a.conceptId||a.bankVersion!==q.version||!q.options.some(o=>o.id===a.choiceId))throw new Error('The backup contains an unknown question, answer, or question-bank version.');
     if(typeof a.answeredAt!=='string'||!Number.isFinite(Date.parse(a.answeredAt)))throw new Error('An attempt has an invalid date.');
     if(a.durationMs!=null&&!validDuration(a.durationMs))throw new Error('An attempt has an invalid response time. Use nonnegative whole milliseconds.');
-    return {id:a.id,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:a.choiceId,correct:a.choiceId===q.correctOptionId,answeredAt:new Date(a.answeredAt).toISOString(),sessionId:typeof a.sessionId==='string'?a.sessionId.slice(0,100):'imported',...(a.durationMs!=null?{durationMs:a.durationMs}:{})};
+    return {id:a.id,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:a.choiceId,correct:a.choiceId===q.correctOptionId,answeredAt:new Date(a.answeredAt).toISOString(),sessionId:typeof a.sessionId==='string'?a.sessionId.slice(0,100):'imported',...(a.durationMs!=null?{durationMs:a.durationMs}:{}),...(a.selfReport!=null?{selfReport:validateSelfReport(a.selfReport)}:{}),...(a.facialMovement!=null?{facialMovement:validateMovement(a.facialMovement,a.durationMs)}:{}),...(a.facialExpression!=null?{facialExpression:validateExpression(a.facialExpression,a.durationMs)}:{})};
   });
 }
 export function validateBackup(value,questions,compatibleBankVersions){

@@ -1,0 +1,21 @@
+{
+  "package": "@vladmandic/face-api",
+  "version": "1.7.15",
+  "source": "https://github.com/vladmandic/face-api/tree/master/src/faceExpressionNet",
+  "license": "MIT",
+  "runtime": "local CPU worker; expression model only",
+  "labels": [
+    "neutral",
+    "happy",
+    "sad",
+    "angry",
+    "fearful",
+    "disgusted",
+    "surprised"
+  ],
+  "limitations": "Expression estimates are not measurements of felt emotion. No frustration label. Model probabilities are not calibrated emotional intensity. Graph weights are experimental personal-use choices.",
+  "files": {
+    "face_expression_model-weights_manifest.json": "5b349c17c7836da506e03422cd6461c74085d8bb2713ad4114647dc5d28174c8",
+    "face_expression_model.bin": "9a9840f2cf1f4c7eab95f197512569345c00d2426754d4608b92af30e0300f3d"
+  }
+}
