@@ -29,6 +29,17 @@ export function graphViewProgress(nodes,attempts,mode='accuracy',preferences){
   }));
 }
 
+// Equal weight per concept, using the already-derived node scores. Missing
+// evidence is excluded from the mean and reported through coverage counts.
+export function graphProfile(progress){
+  const nodes=[...progress.values()],rows={};
+  for(const mode of Object.keys(GRAPH_MODES)){
+    const scores=nodes.map(({display:d})=>mode==='movement'?d.expression?.cameraScore:d[mode==='combined'?'adjusted':'accuracy']).filter(Number.isFinite);
+    rows[mode]={score:scores.length?scores.reduce((sum,score)=>sum+score,0)/scores.length:null,count:scores.length};
+  }
+  return {total:nodes.length,rows,combinedDelta:rows.accuracy.score===null||rows.combined.score===null?null:rows.combined.score-rows.accuracy.score};
+}
+
 export function graphExportLegend(mode,preferences){
   if(mode==='combined')return `Experimental adjusted accuracy: camera ≤${CAMERA_MAX_ADJUSTMENT*100}% of credit; ${normalizeScoringPreferences(preferences).includeSelfReports?`check-ins ≤${SCORE_POLICY.selfReportWeight*100}% more`:'check-ins off'}. Border = facial change.`;
   if(mode==='movement')return 'Camera estimates only: experimental expression score, 0–100. Not measured emotion or mastery.';

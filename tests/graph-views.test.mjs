@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {GRAPH_MODES,normalizeGraphMode,graphViewProgress,MOVEMENT_SCALE,movementWidth} from '../src/graph-views.mjs';
+import {GRAPH_MODES,normalizeGraphMode,graphViewProgress,graphProfile,MOVEMENT_SCALE,movementWidth} from '../src/graph-views.mjs';
 import {graphLayout,drawGraph,masteryFill} from '../src/graph.mjs';
 import {stats,validateAttempts} from '../src/core.mjs';
 import {diagnosticState} from '../src/diagnostic.mjs';
@@ -15,6 +15,29 @@ const movement=()=>{const vector=n=>Object.fromEntries(METRICS.map(m=>[m.id,n]))
 const nodes=a=>new Map([[concept.id,{...stats(a,items.map(q=>q.id)),status:'partial'}]]);
 const view=(a,mode)=>graphViewProgress(nodes(a),a,mode).get(concept.id).display;
 const svg=(a,mode,standalone=false)=>{const progress=graphViewProgress(nodes(a),a,mode);return drawGraph(graphLayout([concept],[],{progress}),units,{progress,fillMode:mode,standalone,selected:concept.id});};
+test('Overall profile excludes missing evidence but counts real zero scores and weights concepts equally',()=>{
+  const attempts=[{...answer(0),facialExpression:expression('angry')},...items.slice(1).map((_,i)=>answer(i+1,false))];
+  const progress=graphViewProgress(new Map([...nodes(attempts),['empty',{...stats([],items.map(q=>q.id))}],['zero',{...stats([{...answer(0,false),conceptId:'zero'}],items.map(q=>q.id))}]]),attempts);
+  const p=graphProfile(progress);
+  assert.equal(p.total,3);assert.deepEqual(p.rows.accuracy,{score:.05,count:2});assert.deepEqual(p.rows.combined,{score:.04,count:2});assert.deepEqual(p.rows.movement,{score:0,count:1});assert.ok(Math.abs(p.combinedDelta+.01)<1e-12);
+  const empty=graphProfile(graphViewProgress(nodes([]),[]));
+  for(const row of Object.values(empty.rows))assert.deepEqual(row,{score:null,count:0});assert.equal(empty.combinedDelta,null);
+});
+test('Overall profile uses the shared scores for all views and enabled check-ins',()=>{
+  const attempts=[{...answer(0),facialExpression:expression('fearful'),selfReport:selfReport({emotion:'fear',intensity:5,valence:'unpleasant'})}];
+  const off=graphProfile(graphViewProgress(nodes(attempts),attempts));
+  for(const mode of Object.keys(GRAPH_MODES)){
+    const on=graphProfile(graphViewProgress(nodes(attempts),attempts,mode,{includeSelfReports:true}));
+    assert.equal(on.rows.accuracy.score,off.rows.accuracy.score);assert.equal(on.rows.movement.score,off.rows.movement.score);assert.equal(on.rows.combined.score,.078);
+  }
+});
+test('Overall profile respects the course while retaining concepts outside a focused map',()=>{
+  const q=questions.find(q=>q.conceptId==='9.1'),attempts=[answer(0),{...answer(0),id:'bc',questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:q.correctOptionId}];
+  for(const course of ['AB','BC']){
+    const d=diagnosticState({concepts,relationships,questions,attempts,course}),p=graphProfile(graphViewProgress(d.nodes,attempts));
+    assert.equal(p.total,course==='AB'?97:127);assert.equal(p.rows.accuracy.count,course==='AB'?1:2);assert.equal(p.rows.accuracy.score,.1);
+  }
+});
 test('Exactly three graph views retain persisted values and default unknown modes to accuracy',()=>{
   assert.deepEqual(Object.keys(GRAPH_MODES),['accuracy','combined','movement']);for(const mode of Object.keys(GRAPH_MODES))assert.equal(normalizeGraphMode(mode),mode);
   for(const mode of [null,undefined,'__proto__',''])assert.equal(normalizeGraphMode(mode),'accuracy');

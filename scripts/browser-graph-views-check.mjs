@@ -28,6 +28,7 @@ fixture.push({...answer(questions.find(q=>q.id==='9.1-Q1'),-2),facialMovement:mo
 fixture.sort((a,b)=>a.answeredAt.localeCompare(b.answeredAt)||a.id.localeCompare(b.id));
 const node=id=>run(`(()=>{const n=document.querySelector('.graph-node[data-concept="${id}"]');return n?{mode:n.dataset.fillMode,score:n.dataset.fillScore,mastery:n.dataset.mastery,movement:n.dataset.movement,fill:n.querySelector('.node-card').getAttribute('fill'),border:n.querySelector('.node-movement-border')?.getAttribute('stroke'),text:n.querySelector('.node-mastery').textContent,status:n.dataset.status,label:n.getAttribute('aria-label')}:null})()`);
 const seed=()=>run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({schemaVersion:1,attempts:${JSON.stringify(fixture)}}))`);
+const profile=()=>run('Object.fromEntries([...document.querySelectorAll(".profile-row")].map(n=>[n.dataset.mode,{score:n.dataset.score,count:Number(n.dataset.count),active:n.getAttribute("aria-pressed")}]))');
 try{
   await mkdir('test-results',{recursive:true});await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
@@ -35,6 +36,15 @@ try{
   await seed();await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');await click('[data-view="graph"]');
   assert.deepEqual(await run('[...document.querySelector("#graph-mode").options].map(o=>o.value)'),['accuracy','combined','movement']);
   const original=await stored(),recommendation=await run('document.querySelector(".next-check").dataset.nextConcept');
+  const initialProfile=await profile();
+  assert.equal(Number(initialProfile.accuracy.score),.25);assert.equal(initialProfile.accuracy.count,4);assert.equal(initialProfile.movement.count,3);
+  assert.ok(Math.abs(Number(initialProfile.combined.score)-.210625)<1e-9);assert.ok(Math.abs(Number(initialProfile.movement.score)-1.25/3)<1e-9);
+  assert.ok(await run('document.querySelector(".graph-profile header").textContent.includes("127 concepts")'));
+  assert.equal(await run('document.querySelector(".graph-profile").getBoundingClientRect().left>document.querySelector(".map-panel").getBoundingClientRect().right'),true);
+  await run('document.querySelector("#profile-movement").focus()');
+  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  assert.equal(await run('document.querySelector("#graph-mode").value'),'movement');assert.equal(await run('document.activeElement.id'),'profile-movement');
+  assert.equal((await profile()).movement.active,'true');await click('#profile-accuracy');
   assert.equal((await node('1.11')).score,'80');assert.equal((await node('1.11')).mastery,'78');assert.equal((await node('1.11')).fill,masteryFill(.8));
   assert.equal(await run('document.querySelector(\'.graph-node[data-concept="1.11"] .node-checkin text\').textContent'),'Est. Fear · 100%');
   assert.equal(await run('document.querySelector(\'.graph-node[data-concept="F04"] .node-checkin\')'),null);
@@ -43,6 +53,7 @@ try{
   assert.ok((await node('1.11')).label.includes('Camera expression estimate: Fear'));
   await snap('graph-view-accuracy');await click('[data-action="zoom-in"]');const transform=await run('document.querySelector("#graph-world").getAttribute("transform")');
   await change('#graph-mode','combined');
+  assert.equal((await profile()).combined.active,'true');
   assert.equal(await run('document.querySelector("#graph-world").getAttribute("transform")'),transform);
   const combined=await node('1.11');assert.equal(combined.fill,masteryFill(.66));assert.equal(combined.score,'66');assert.equal(combined.border,masteryFill(.285,MOVEMENT_BORDER_SCALE));assert.equal(combined.status,'passed');assert.ok(combined.text.includes('adjusted'));
   assert.equal((await node('F04')).border,undefined);assert.ok((await node('F04')).text.includes('no estimate'));
@@ -71,6 +82,7 @@ try{
   const lines=progressCSV.replace(/^\uFEFF/,'').split('\r\n').map(parseLine),columns=lines[0],cells=lines.find(line=>line[0]==='1.11'),row=Object.fromEntries(columns.map((key,i)=>[key,cells[i]]));
   assert.equal(row.selfReportContributionEnabled,'true');assert.equal(Number(row.selfReportAdjustment),.016);assert.equal(Number(row.adjustedScore),.6472);assert.equal(Number(row.cameraAdjustedAccuracy),.66);
   await click('[data-view="graph"]');await change('#graph-mode','combined');
+  assert.ok(Math.abs(Number((await profile()).combined.score)-.206925)<1e-9);assert.equal(Number((await profile()).accuracy.score),.25);
   assert.equal((await node('1.11')).fill,masteryFill(.6472));assert.equal((await node('1.11')).score,'65');assert.equal((await node('1.11')).status,'passed');
   assert.ok(await run('document.querySelector(".score-breakdown").textContent.includes("Camera: 17.5% credit reduction · Check-ins: 1.6% (1 saved)")'));
   assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),recommendation);assert.deepEqual(await stored(),original);
@@ -97,7 +109,9 @@ try{
   await click('[data-action="notes"][data-id="1.11"]');await click('[data-action="tab"][data-tab="map"]');assert.equal(await run('document.querySelector("#graph-mode").value'),'movement');
   await change('#graph-mode','combined');await click('[data-view="graph"]');assert.equal(await run('document.querySelector("#graph-mode").value'),'combined');
   await change('#graph-scope','all');assert.ok(await node('9.1'));assert.equal(await run('document.querySelector(\'.graph-node[data-concept="9.1"] .node-checkin text\').textContent'),'Est. Sadness · 100%');await change('#course','AB');assert.equal(await node('9.1'),null);assert.equal(await run('document.querySelector("#graph-mode").value'),'combined');
+  assert.equal((await profile()).accuracy.count,3);assert.equal((await profile()).movement.count,2);assert.equal(Number((await profile()).accuracy.score),.3);assert.ok(await run('document.querySelector(".graph-profile header").textContent.includes("97 concepts")'));
   await change('#course','BC');await change('#graph-scope','focus');
+  assert.equal((await profile()).accuracy.count,4);assert.equal(Number((await profile()).accuracy.score),.25);
   await run('window.qaDownloads=[];window.qaURL=URL.createObjectURL;window.qaClick=HTMLAnchorElement.prototype.click;URL.createObjectURL=b=>{qaDownloads.push(b);return "blob:qa"};HTMLAnchorElement.prototype.click=function(){}');
   for(const mode of ['accuracy','combined','movement']){await change('#graph-mode',mode);await click('[data-action="export-map"]');}
   const exports=await run('await Promise.all(qaDownloads.map(b=>b.text()))');
@@ -106,6 +120,8 @@ try{
   for(let i=0;i<3;i++)await writeFile('test-results/graph-view-'+['accuracy','combined','movement'][i]+'.svg',exports[i]);
   await run('URL.createObjectURL=qaURL;HTMLAnchorElement.prototype.click=qaClick');
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,screenWidth:390,screenHeight:844,deviceScaleFactor:1,mobile:true});await waitFor('innerWidth===390');
+  assert.equal(await run('document.querySelector(".graph-profile").getBoundingClientRect().top>=document.querySelector(".map-panel").getBoundingClientRect().bottom'),true);
+  await run('document.querySelector(".graph-profile").scrollIntoView({block:"center"})');await snap('graph-profile-mobile');
   for(const mode of ['accuracy','combined','movement']){
     await change('#graph-mode',mode);assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true);
     assert.ok(await run('[...document.querySelectorAll(".graph-node")].every(n=>{const c=n.querySelector(".node-card").getBBox();return [...n.querySelectorAll("text")].every(t=>{const b=t.getBBox();return b.x>=0&&b.x+b.width<=c.width&&b.y>=0&&b.y+b.height<=c.height})})'));
@@ -126,6 +142,8 @@ try{
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');await click('[data-view="graph"]');assert.equal(await run('document.querySelector("#graph-mode").value'),'accuracy');
   await change('#graph-mode','combined');await click('[data-view="settings"]');await click('[data-action="delete-data"]');await click('[data-action="confirm-delete"]');await click('[data-view="graph"]');
   assert.equal(await run('document.querySelector("#graph-mode").value'),'accuracy');assert.equal((await node('1.11')).score,'unscored');assert.deepEqual(await stored(),[]);
+  for(const row of Object.values(await profile())){assert.equal(row.score,'unscored');assert.equal(row.count,0);}
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});await waitFor('innerWidth===1440');await run('scrollTo(0,0)');await snap('graph-profile-empty');
   assert.deepEqual(errors,[]);
   console.log('PASS camera-based labels, bounded combined score, optional check-in contribution, unchanged accuracy and camera-only index, matching CSV/SVG exports, backup and legacy import, untouched attempts and recommendations, reload and cross-tab preferences, mobile settings and graph bounds, and deletion.');
 }finally{ws.close();}
