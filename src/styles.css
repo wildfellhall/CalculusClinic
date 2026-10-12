@@ -71,6 +71,8 @@ button,select,input[type=search]{box-shadow:none}
 .profile-method{font-size:11px;color:var(--muted);margin-top:10px}
 .profile-method>summary{cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .profile-method p{margin-top:10px}
+.graph-profile>.report-download{width:100%;margin-top:17px;font-size:11px;padding:9px 6px;background:var(--mint)}
+.report-download[aria-busy="true"]{cursor:wait}
 @media(max-width:1050px){.graph-workspace{grid-template-columns:minmax(0,1fr)}.profile-rows{grid-template-columns:repeat(3,minmax(0,1fr))}.graph-profile>header{padding-bottom:10px;margin-bottom:12px}.graph-profile{padding:16px}.profile-difference{margin-top:12px}}
 @media(max-width:520px){.profile-rows{gap:7px}.profile-row{padding:10px 8px}.profile-row-top{display:block;font-size:12px}.profile-row-top strong{display:block;margin-top:5px;font-size:21px}.profile-coverage{font-size:10px}.graph-profile{padding:14px}}
 .graph-selection{margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:26px;border:1px dashed #b9cdad;border-radius:16px;padding:22px;background:#f3f6e9}

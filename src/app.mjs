@@ -7,8 +7,10 @@ import {expressionColumns} from './expressions.mjs';
 import {GRAPH_MODES,normalizeGraphMode,graphViewProgress,graphProfile,MOVEMENT_SCALE,MOVEMENT_BORDER_SCALE,movementWidth} from './graph-views.mjs';
 import {formatMathText,refreshMathOverflow} from './math.mjs';
 import {MovementCamera} from './camera.mjs';
+import {CameraAccess,CAMERA_ACCESS_KEY} from './camera-access.mjs';
 import {selfReport,observationStats,observationColumns} from './observations.mjs';
 import {renderObservationPanel,renderNodeObservations,observationMethod,scoreText} from './observation-ui.mjs';
+import {reportData} from './report-data.mjs';
 
 const {concepts,relationships,questions,units,sources,metadata}=window.CALCULUS_DATA;
 const math=text=>formatMathText(text,window.CALCULUS_DATA.mathText);
@@ -26,8 +28,12 @@ try{
 }catch{state.storageMessage='Saved progress could not be read. This session still works. Export any new attempts before closing; existing stored data will be kept until you restore a valid backup or delete it in Settings.';}
 let readFailed=!!state.storageMessage;
 let dataRevision=0;
+let reportBusy=false;
+let autoCameraSession=null,pageActive=true;
 const questionClock=new QuestionClock();
 const camera=new MovementCamera(()=>{syncQuestionClock();updateCameraUI();});
+const cameraAccess=new CameraAccess({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},mediaDevices:navigator.mediaDevices,permissions:navigator.permissions,secure:isSecureContext,
+  onRevoke:()=>camera.stop(),onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
 function updateQuestionTimer(){
   const el=document.querySelector('#question-timer'),label=document.querySelector('#timer-status');
   if(!el||!state.quiz)return;
@@ -37,7 +43,16 @@ function updateQuestionTimer(){
 }
 function syncQuestionClock(focused=document.hasFocus()){
   const quiz=state.quiz,current=quiz?.list[quiz.index];
-  camera.sync({key:current?quiz.sessionId+':'+current.id:null,allowed:state.view==='practice'&&!!current,active:state.view==='practice'&&!!current&&!quiz.answered&&!document.hidden&&focused});
+  const allowed=pageActive&&state.view==='practice'&&!!current&&!document.hidden&&cameraAccess.canStart;
+  const active=allowed&&!quiz.answered&&focused;
+  if(!allowed)autoCameraSession=null;
+  camera.sync({key:current?quiz.sessionId+':'+current.id:null,allowed,active});
+  if(active&&camera.stage==='off'&&autoCameraSession!==quiz.sessionId){
+    // Try once per visible practice session. Model/device failures need an
+    // explicit retry, rather than a loop of permission or camera requests.
+    autoCameraSession=quiz.sessionId;
+    void camera.start().then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again in Settings.');});
+  }
   const z=state.quiz,q=z?.list[z.index];
   if(!q)questionClock.reset();
   else{
@@ -57,20 +72,33 @@ function updateCheckInScore(){
 }
 function updateCameraUI(){
   const el=document.querySelector('#camera-state');if(!el)return;
+  const focused=document.activeElement;
   const on=camera.stage!=='off',answered=!!state.quiz?.answered,paused=on&&!camera.active;
   const labels={off:'Camera off',loading:'Starting camera',uncalibrated:'Needs calibration',calibrating:'Calibrating',ready:'Camera on'};
   el.textContent=paused?'Camera paused':labels[camera.stage];
   document.querySelector('#camera-summary').textContent=el.textContent;
-  const status=paused?'':camera.message;
+  const status=paused?'':camera.message||(!on?cameraAccess.message:'');
   const statusEl=document.querySelector('#camera-status');if(statusEl.textContent!==status)statusEl.textContent=status;
   statusEl.hidden=!status;
-  const enable=document.querySelector('#camera-enable');enable.hidden=on;enable.disabled=answered;
+  const enable=document.querySelector('#camera-enable');enable.hidden=on;enable.disabled=answered||cameraAccess.pending;
+  enable.textContent=cameraAccess.pending?'Waiting for permission…':'Enable camera';
+  if(on&&camera.stage==='loading')document.querySelector('#optional-observations').open=true;
   const calibration=document.querySelector('#camera-calibrate');calibration.hidden=!['uncalibrated','ready'].includes(camera.stage);calibration.disabled=answered;
   calibration.textContent=camera.stage==='ready'?'Recalibrate resting face':'Calibrate resting face';
-  document.querySelector('#camera-stop').hidden=!on;
+  const stop=document.querySelector('#camera-stop');stop.hidden=!on;
+  if(stop.hidden&&focused===stop)enable.focus();
   const progress=document.querySelector('#calibration-progress');progress.hidden=camera.stage!=='calibrating';progress.value=camera.progress;
   document.querySelector('#camera-preview-host').hidden=!on;
   const live=document.querySelector('#camera-expression');if(live){live.hidden=!on||paused||camera.stage!=='ready';const x=camera.liveExpression;live.textContent=x?`Camera estimate: ${x.label}${x.label==='Mixed / uncertain'?'':` · ${pct(x.confidence)} model probability`}`:'Waiting for a confident expression estimate…';}
+}
+function updateCameraSettings(){
+  const status=document.querySelector('#camera-access-state');if(!status)return;
+  const focused=document.activeElement;
+  status.textContent=cameraAccess.pending?'Waiting for permission':cameraAccess.enabled?(cameraAccess.canStart?'On during practice':'Permission needed'):'Off';
+  const message=document.querySelector('#camera-access-message');message.textContent=[cameraAccess.message,cameraAccess.storageWarning].filter(Boolean).join(' ');message.hidden=!message.textContent;
+  const enable=document.querySelector('#camera-settings-enable');enable.hidden=cameraAccess.enabled;enable.disabled=cameraAccess.pending;
+  const revoke=document.querySelector('#camera-revoke');revoke.hidden=!cameraAccess.enabled&&!cameraAccess.pending;
+  if(revoke.hidden&&focused===revoke)enable.focus();
 }
 document.addEventListener('toggle',e=>{if(e.target.id==='optional-observations'&&e.target.isConnected&&state.quiz)state.quiz.observationOpen=e.target.open;},true);
 const eligible=c=>state.course==='BC'||c.scope!=='BC only';
@@ -99,7 +127,24 @@ function renderGraphProfile(){
   return `<aside class="graph-profile" aria-labelledby="graph-profile-title"><header><h2 id="graph-profile-title">Overall profile</h2><p>AP Calculus ${state.course} · ${profile.total} concepts</p></header><div class="profile-rows" role="group" aria-label="Compare graph scoring views">${[['accuracy','Accuracy'],['movement','Emotions'],['combined','Both']].map(([mode,label])=>{
     const {score,count}=profile.rows[mode],value=score===null?'—':Number((score*100).toFixed(1)),active=state.graphMode===mode;
     return `<button id="profile-${mode}" class="profile-row" data-action="graph-mode" data-mode="${mode}" data-score="${score??'unscored'}" data-count="${count}" aria-pressed="${active}" aria-label="${label}: ${score===null?'no data':value+' out of 100'}, ${count} of ${profile.total} concepts scored. Show this view."><span class="profile-row-top"><span>${label}</span><strong>${value}${score===null?'':'<small>/100</small>'}</strong></span><span class="profile-bar" aria-hidden="true"><span style="width:${score===null?0:score*100}%"></span></span><span class="profile-coverage">${count}/${profile.total} concepts scored</span></button>`;
-  }).join('')}</div><p class="profile-difference">${difference}</p><details class="profile-method"><summary>How this is compared</summary><p>Mean score across scored concepts in the full selected course, including foundations. Every concept has equal weight; missing data stays unscored. Map zoom and filters do not change these averages.</p><p>Emotions uses camera expression estimates. Both starts from answer accuracy and applies your enabled adjustments. Check-ins are ${state.scoringPreferences.includeSelfReports?'included':'off'}.</p></details></aside>`;
+  }).join('')}</div><p class="profile-difference">${difference}</p><details class="profile-method"><summary>How this is compared</summary><p>Mean score across scored concepts in the full selected course, including foundations. Every concept has equal weight; missing data stays unscored. Map zoom and filters do not change these averages.</p><p>Emotions uses camera expression estimates. Both starts from answer accuracy and applies your enabled adjustments. Check-ins are ${state.scoringPreferences.includeSelfReports?'included':'off'}.</p></details>${reportButton()}</aside>`;
+}
+function reportButton(){return `<button class="button compact report-download" data-action="export-report" ${reportBusy?'disabled aria-busy="true"':''}>${reportBusy?'Preparing PDF…':'Download report · PDF'}</button>`;}
+async function exportReport(){
+  if(reportBusy)return;
+  reportBusy=true;const revision=dataRevision;
+  const update=()=>document.querySelectorAll('[data-action="export-report"]').forEach(el=>{el.disabled=reportBusy;el.setAttribute('aria-busy',String(reportBusy));el.textContent=reportBusy?'Preparing PDF…':'Download report · PDF';});
+  update();announce('Preparing your PDF report.');
+  try{
+    const currentMap=!!document.querySelector('#graph-container')&&graphState;
+    const snapshot=reportData({concepts,relationships,questions,attempts:structuredClone(state.attempts),course:state.course,preferences:{...state.scoringPreferences},...(currentMap?{mapIds:graphState.layout.nodes.map(n=>n.id),mapEdges:graphState.layout.edges,mapFocus:state.graphScope==='focus'?state.selected:null,mapLabel:state.graphScope==='focus'?`Connections around ${state.selected}`:state.graphScope==='unit'?`${unitLabel(byId.get(state.selected).unit)} and prerequisites`:'Whole curriculum'}:{})});
+    const {createReportPDF}=await import('./report-pdf.mjs');
+    const bytes=await createReportPDF(snapshot,units);
+    if(revision!==dataRevision){toast('Report cancelled because saved data was deleted.');return;}
+    download(`calculus-clinic-${snapshot.course.toLowerCase()}-report-${snapshot.generatedAt.slice(0,10)}.pdf`,bytes,'application/pdf');
+    toast('Your PDF report is ready.');
+  }catch(error){toast('Could not create the PDF report. Please try again.');console.error('PDF report failed:',error);}
+  finally{reportBusy=false;update();}
 }
 function setGraphMode(mode){
   state.graphMode=normalizeGraphMode(mode);persist();renderStoredProgress();announce('Graph view: '+GRAPH_MODES[state.graphMode].label);
@@ -168,7 +213,7 @@ function render(){
   if(focusId){const next=document.getElementById(focusId);if(next){next.focus();if(typeof selection==='number'&&next.setSelectionRange)next.setSelectionRange(selection,selection);}}
   if(state.view==='graph'||(state.view==='atlas'&&state.tab==='map'))mountGraph();
   camera.mount(document.querySelector('#camera-preview-host'));
-  syncQuestionClock();updateCameraUI();updateCheckInScore();
+  syncQuestionClock();updateCameraUI();updateCameraSettings();updateCheckInScore();
   requestAnimationFrame(refreshMathOverflow);
 }
 function renderBrowse(){
@@ -236,23 +281,24 @@ function renderPractice(c){
 }
 function renderProgress(overall){
   const rows=concepts.filter(eligible).filter(c=>['passed','review','partial'].includes(state.progressFilter)?diagnostic.nodes.get(c.id).status===state.progressFilter:state.progressFilter==='all'||(state.progressFilter==='started'?conceptStats(c).attempted>0:conceptStats(c).attempted===0));
-  return `<section class="page-heading"><h1>Your progress</h1><button class="text-link" data-action="view" data-view="settings">Backups & exports</button></section>${renderDiagnosticSummary()}<section class="progress-summary" aria-label="Practice summary"><div><span>First answers</span><strong>${pct(overall.firstAccuracy)}</strong><small>${overall.firstCorrect} of ${overall.attempted} correct</small></div><div><span>Latest answers</span><strong>${pct(overall.latestAccuracy)}</strong><small>${overall.latestCorrect} of ${overall.attempted} correct</small></div><div><span>Total attempts</span><strong>${overall.total}</strong><small>${overall.correct} correct, including retries</small></div></section><details class="accuracy-note"><summary>How accuracy is counted</summary><p>Unanswered questions are unscored. First-attempt accuracy keeps your first answer to each question; latest accuracy uses the most recent. All-attempt accuracy includes retries. Accuracy graph fill uses latest correct answers divided by all available questions. Other graph views show an experimental combined score or a camera expression score. The combined score can optionally include check-ins. The exported practice-mastery score keeps a timing adjustment of at most 3 percentage points. Accuracy and passing depend only on answers.</p></details><section class="table-panel"><div class="section-line table-top"><h2>By concept</h2><label>Show <select id="progress-filter"><option value="all" ${state.progressFilter==='all'?'selected':''}>All concepts</option><option value="started" ${state.progressFilter==='started'?'selected':''}>Practiced</option><option value="new" ${state.progressFilter==='new'?'selected':''}>Not yet tried</option>${['passed','review','partial'].map(status=>`<option value="${status}" ${state.progressFilter===status?'selected':''}>${DIAGNOSTIC_LABELS[status]}</option>`).join('')}</select></label></div><div class="table-scroll"><table class="progress-table"><thead><tr><th>Concept</th><th>Coverage</th><th>First accuracy</th><th>Latest accuracy</th><th>Attempts</th><th>Question history</th></tr></thead><tbody>${rows.map(c=>{const s=conceptStats(c);return `<tr><td><span class="id-cell">${c.id}</span> <button class="text-link" data-action="select" data-id="${c.id}">${esc(c.title)}</button><small class="diagnostic-status">${DIAGNOSTIC_LABELS[diagnostic.nodes.get(c.id).status]}</small></td><td>${s.attempted}/${s.available}</td><td>${pct(s.firstAccuracy)}<small>${s.firstCorrect}/${s.attempted} correct</small></td><td>${pct(s.latestAccuracy)}<small>${s.latestCorrect}/${s.attempted} correct</small></td><td>${s.total}</td><td><details class="question-history"><summary>${s.available} questions</summary>${qs(c.id).map((q,i)=>{const st=stats(state.attempts,[q.id]);return `<div><strong>Q${i+1}</strong> ${math(q.prompt)}<small>${st.attempted?`${st.correct}/${st.total} attempts correct · ${pct(st.allAccuracy)} · First: ${st.firstCorrect?'correct':'incorrect'} · Latest: ${st.latestCorrect?'correct':'incorrect'}`:'Not yet answered'}</small>${st.attempted?`<small class="question-time-history">Latest time: ${formatDuration(st.latestDurationMs)}${st.timedAttempts?` · Average: ${formatDuration(st.averageDurationMs)} (${st.timedAttempts} timed ${st.timedAttempts===1?'attempt':'attempts'})`:''}</small>`:''}</div>`;}).join('')}<button class="button compact" data-action="practice" data-id="${c.id}">Practice this concept</button></details>${renderNodeObservations(state.attempts,c.id,state.scoringPreferences)}</td></tr>`;}).join('')}</tbody></table>${!rows.length?'<div class="empty-state"><h3>No practice here yet</h3><p>Try a concept’s questions to start a record.</p><button class="button" data-action="view" data-view="practice">Choose a concept</button></div>':''}</div></section>`;
+  return `<section class="page-heading"><h1>Your progress</h1><div class="button-row">${reportButton()}<button class="text-link" data-action="view" data-view="settings">Backups & exports</button></div></section>${renderDiagnosticSummary()}<section class="progress-summary" aria-label="Practice summary"><div><span>First answers</span><strong>${pct(overall.firstAccuracy)}</strong><small>${overall.firstCorrect} of ${overall.attempted} correct</small></div><div><span>Latest answers</span><strong>${pct(overall.latestAccuracy)}</strong><small>${overall.latestCorrect} of ${overall.attempted} correct</small></div><div><span>Total attempts</span><strong>${overall.total}</strong><small>${overall.correct} correct, including retries</small></div></section><details class="accuracy-note"><summary>How accuracy is counted</summary><p>Unanswered questions are unscored. First-attempt accuracy keeps your first answer to each question; latest accuracy uses the most recent. All-attempt accuracy includes retries. Accuracy graph fill uses latest correct answers divided by all available questions. Other graph views show an experimental combined score or a camera expression score. The combined score can optionally include check-ins. The exported practice-mastery score keeps a timing adjustment of at most 3 percentage points. Accuracy and passing depend only on answers.</p></details><section class="table-panel"><div class="section-line table-top"><h2>By concept</h2><label>Show <select id="progress-filter"><option value="all" ${state.progressFilter==='all'?'selected':''}>All concepts</option><option value="started" ${state.progressFilter==='started'?'selected':''}>Practiced</option><option value="new" ${state.progressFilter==='new'?'selected':''}>Not yet tried</option>${['passed','review','partial'].map(status=>`<option value="${status}" ${state.progressFilter===status?'selected':''}>${DIAGNOSTIC_LABELS[status]}</option>`).join('')}</select></label></div><div class="table-scroll"><table class="progress-table"><thead><tr><th>Concept</th><th>Coverage</th><th>First accuracy</th><th>Latest accuracy</th><th>Attempts</th><th>Question history</th></tr></thead><tbody>${rows.map(c=>{const s=conceptStats(c);return `<tr><td><span class="id-cell">${c.id}</span> <button class="text-link" data-action="select" data-id="${c.id}">${esc(c.title)}</button><small class="diagnostic-status">${DIAGNOSTIC_LABELS[diagnostic.nodes.get(c.id).status]}</small></td><td>${s.attempted}/${s.available}</td><td>${pct(s.firstAccuracy)}<small>${s.firstCorrect}/${s.attempted} correct</small></td><td>${pct(s.latestAccuracy)}<small>${s.latestCorrect}/${s.attempted} correct</small></td><td>${s.total}</td><td><details class="question-history"><summary>${s.available} questions</summary>${qs(c.id).map((q,i)=>{const st=stats(state.attempts,[q.id]);return `<div><strong>Q${i+1}</strong> ${math(q.prompt)}<small>${st.attempted?`${st.correct}/${st.total} attempts correct · ${pct(st.allAccuracy)} · First: ${st.firstCorrect?'correct':'incorrect'} · Latest: ${st.latestCorrect?'correct':'incorrect'}`:'Not yet answered'}</small>${st.attempted?`<small class="question-time-history">Latest time: ${formatDuration(st.latestDurationMs)}${st.timedAttempts?` · Average: ${formatDuration(st.averageDurationMs)} (${st.timedAttempts} timed ${st.timedAttempts===1?'attempt':'attempts'})`:''}</small>`:''}</div>`;}).join('')}<button class="button compact" data-action="practice" data-id="${c.id}">Practice this concept</button></details>${renderNodeObservations(state.attempts,c.id,state.scoringPreferences)}</td></tr>`;}).join('')}</tbody></table>${!rows.length?'<div class="empty-state"><h3>No practice here yet</h3><p>Try a concept’s questions to start a record.</p><button class="button" data-action="view" data-view="practice">Choose a concept</button></div>':''}</div></section>`;
 }
 function renderSettings(){
   return `<section class="settings-page"><div class="page-heading"><h1>Settings</h1></div>
+    <section class="settings-section camera-settings"><div class="camera-heading"><h2>Camera use</h2><span id="camera-access-state" class="camera-state">${cameraAccess.enabled?'On during practice':'Off'}</span></div><p>Starts automatically during practice after permission is granted. Calibrate your resting face at the start of each camera session.</p><div class="button-row"><button class="button" id="camera-settings-enable" data-action="camera-enable" ${cameraAccess.enabled?'hidden':''}>Enable camera</button><button class="button" id="camera-revoke" data-action="camera-revoke" ${cameraAccess.enabled?'':'hidden'}>Revoke camera access</button></div><p id="camera-access-message" class="small muted" role="status" hidden></p><details class="score-method"><summary>Browser permission</summary><p>Revoking access here stops capture immediately and keeps camera use off in this app. To remove the browser’s stored permission too, open the camera or site-controls icon beside the address bar and reset this site’s camera permission.</p></details></section>
     <section class="settings-section scoring-settings" aria-labelledby="scoring-title"><h2 id="scoring-title">Score preferences</h2><label class="scoring-toggle"><input type="checkbox" id="include-self-reports" ${state.scoringPreferences.includeSelfReports?'checked':''} aria-describedby="self-report-setting-help"><span>Include self-reported check-ins</span></label><p id="self-report-setting-help" class="small muted">Unpleasant check-ins can reduce the combined score by up to ${SCORE_POLICY.selfReportWeight*100}% of answer credit. Accuracy and the camera-only view stay separate.</p><details class="score-method"><summary>How contributions are counted</summary><p>${combinedExplanation(state.scoringPreferences)}</p></details></section>
     <section class="settings-section"><h2>Saved practice</h2><p><strong>${state.attempts.length} ${state.attempts.length===1?'attempt':'attempts'}</strong> stored in this session. Progress is saved in this browser; it does not sync across devices.</p><div class="button-row"><button class="button" data-action="backup">Export backup</button><label class="button file-button">Import backup<input id="import-file" type="file" accept="application/json,.json"></label></div><p class="muted small">Backups include saved check-ins, camera summaries and score preferences. Import merges attempts and restores any included score preference.</p></section>
-    <details class="settings-section"><summary>Optional check-ins & camera data</summary><p>Camera use is off by default and starts only from a practice question after you enable it. Measurements run locally. Images, video, audio and the resting reference are never stored or uploaded. Only numeric summaries and voluntary emotion check-ins are saved with answers.</p><p>The camera stops when you leave practice or hide this tab. A new camera session needs a new resting-face calibration. Check-ins work without a camera. Graph views can show an experimental camera-adjusted score, with facial movement as a separate border. Raw answer accuracy, passing and diagnostic recommendations do not change. Check-ins contribute to the combined view only when enabled above.</p>${observationMethod(state.scoringPreferences)}</details>
-    <details class="settings-section"><summary>Progress & observation exports</summary><div class="download-list"><button data-action="export-progress">Concept accuracy, mastery & observations <span>CSV ↓</span></button><button data-action="export-question-progress">Question accuracy <span>CSV ↓</span></button><button data-action="export-attempts">Every attempt <span>CSV ↓</span></button></div></details>
+    <details class="settings-section"><summary>Check-ins & camera data</summary><p>Camera permission is requested on your first visit. Once allowed, camera use starts automatically in practice. You can revoke access above. Measurements run locally. Images, video, audio and the resting reference are never stored or uploaded. Only numeric summaries and voluntary emotion check-ins are saved with answers.</p><p>The camera stops when you leave practice or hide this tab. A new camera session needs a new resting-face calibration. Camera preferences belong to this browser and are not restored from practice backups. Check-ins work without a camera. Graph views can show an experimental camera-adjusted score, with facial movement as a separate border. Raw answer accuracy, passing and diagnostic recommendations do not change. Check-ins contribute to the combined view only when enabled above.</p>${observationMethod(state.scoringPreferences)}</details>
+    <details class="settings-section"><summary>Progress & observation exports</summary><div class="download-list">${reportButton()}<button data-action="export-progress">Concept accuracy, mastery & observations <span>CSV ↓</span></button><button data-action="export-question-progress">Question accuracy <span>CSV ↓</span></button><button data-action="export-attempts">Every attempt <span>CSV ↓</span></button></div></details>
     <details class="settings-section"><summary>Curriculum downloads</summary><div class="download-list">${[['concepts.csv','Concepts','CSV'],['relationships.csv','Relationships','CSV'],['questions.csv','Questions & answers','CSV'],['ontology.json','Complete ontology','JSON'],['concept-map.svg','Complete concept graph','SVG'],['coverage.csv','AP topic coverage','CSV']].map(([file,label,type])=>`<a download href="/data/${file}">${label}<span>${type} ↓</span></a>`).join('')}</div></details>
-    <section class="settings-section delete-section"><h2>Delete saved data</h2><p>Remove all practice history, accuracy and mastery records, emotion check-ins, camera summaries, score preferences and the current practice set from this browser. Downloaded backups and data on other devices are kept.</p><button class="button danger" id="delete-data" data-action="delete-data">Delete my practice data</button></section>
+    <section class="settings-section delete-section"><h2>Delete saved data</h2><p>Remove all practice history, accuracy and mastery records, emotion check-ins, camera summaries, score preferences and the current practice set from this browser. Camera use will be turned off. Downloaded backups and data on other devices are kept.</p><button class="button danger" id="delete-data" data-action="delete-data">Delete my practice data</button></section>
     <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description"><h2 id="delete-title">Delete your practice data?</h2><p id="delete-description">All ${state.attempts.length} practice attempts, accuracy records, emotion check-ins and camera summaries will be removed from this browser. Your current practice set will also end. This cannot be undone without an exported backup.</p><p id="delete-error" class="delete-error" role="alert" hidden></p><div class="button-row"><button class="button" data-action="cancel-delete" autofocus>Keep my data</button><button class="button danger" data-action="confirm-delete">Delete data</button></div></dialog>
   </section>`;
 }
 function deleteProgress(){
   try{localStorage.removeItem(STORAGE_KEY);}
   catch{const error=document.querySelector('#delete-error');error.hidden=false;error.textContent='This browser could not delete saved data. Your practice history is still available. Try again or manage this site’s storage in your browser settings.';return;}
-  dataRevision++;state.attempts=[];state.quiz=null;state.graphMode='accuracy';state.scoringPreferences=normalizeScoringPreferences();state.storageMessage='';readFailed=false;camera.stop();
+  dataRevision++;state.attempts=[];state.quiz=null;state.graphMode='accuracy';state.scoringPreferences=normalizeScoringPreferences();state.storageMessage='';readFailed=false;cameraAccess.revoke();
   document.querySelector('#delete-dialog').close();render();document.querySelector('#delete-data').focus();toast('Your practice data has been deleted from this browser.');
 }
 
@@ -291,13 +337,14 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action]');if(!el)return;const {action,id}=el.dataset;
   if(el.tagName==='A')e.preventDefault();
   if(action==='select')return selectConcept(id);
+  if(action==='export-report'){void exportReport();return;}
   if(action==='graph-mode'){setGraphMode(el.dataset.mode);return;}
   if(action==='notes')return selectConcept(id,'notes');
   if(action==='practice')return startPractice(id);
   if(action==='diagnostic'){startPractice(id,{diagnosticCheck:true});document.querySelector('.question-title')?.focus();return;}
   if(action==='recommendation-map'){state.view='graph';state.selected=id;state.graphScope='focus';state.query='';render();document.querySelector('#graph-container').scrollIntoView({block:'center',behavior:'smooth'});return;}
-  if(action==='camera-enable'){camera.start();return;}
-  if(action==='camera-stop'){camera.stop();return;}
+  if(action==='camera-enable'){void cameraAccess.request();return;}
+  if(action==='camera-stop'||action==='camera-revoke'){cameraAccess.revoke();announce('Camera access is off in this app.');return;}
   if(action==='camera-calibrate'){camera.beginCalibration();return;}
   if(action==='submit'){
     const z=state.quiz;if(!z||z.answered||!z.choice)return;const q=z.list[z.index];
@@ -356,20 +403,22 @@ function renderStoredProgress(){
   render();
   if(viewport&&document.querySelector('#map-svg')){Object.assign(graphState,viewport);transformGraph();}
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden)camera.stop();syncQuestionClock();updateCameraUI();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
 window.addEventListener('blur',()=>{syncQuestionClock(false);updateCameraUI();});
 window.addEventListener('focus',()=>{syncQuestionClock();updateCameraUI();});
-window.addEventListener('pagehide',()=>{camera.stop();questionClock.setRunning(false);});
-window.addEventListener('pageshow',()=>syncQuestionClock());
+window.addEventListener('pagehide',()=>{pageActive=false;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
+window.addEventListener('pageshow',()=>{pageActive=true;syncQuestionClock();});
 setInterval(updateQuestionTimer,250);
 window.addEventListener('storage',e=>{
+  if(e.key===CAMERA_ACCESS_KEY||e.key===null)cameraAccess.syncFromStorage();
   if(e.key!==STORAGE_KEY&&e.key!==null)return;
   try{
     // Read the current value so an older queued event cannot restore deleted data.
     const saved=localStorage.getItem(STORAGE_KEY);
-    if(saved===null){dataRevision++;state.attempts=[];state.quiz=null;state.graphMode='accuracy';state.scoringPreferences=normalizeScoringPreferences();state.storageMessage='';readFailed=false;camera.stop();renderStoredProgress();toast('Practice data was cleared in another tab.');return;}
+    if(saved===null){dataRevision++;state.attempts=[];state.quiz=null;state.graphMode='accuracy';state.scoringPreferences=normalizeScoringPreferences();state.storageMessage='';readFailed=false;cameraAccess.revoke();renderStoredProgress();toast('Practice data was cleared in another tab.');return;}
     const value=JSON.parse(saved);if(value.schemaVersion!==1)return;
     state.attempts=validateAttempts(value.attempts,questions);state.graphMode=normalizeGraphMode(value.graphMode);state.scoringPreferences=normalizeScoringPreferences(value.scoringPreferences);readFailed=false;state.storageMessage='';if(state.view!=='practice'||!state.quiz)renderStoredProgress();
   }catch{/* Retain the valid session if another tab writes invalid data. */}
 });
 render();
+if(!document.hidden)void cameraAccess.initialize();

@@ -6,6 +6,7 @@ import {METRICS,calibrate,MovementSummary,selfReport} from '../src/observations.
 import {ExpressionSummary,EXPRESSION_LABELS} from '../src/expressions.mjs';
 import {masteryFill,UNPRACTICED_FILL} from '../src/graph.mjs';
 import {MOVEMENT_SCALE,MOVEMENT_BORDER_SCALE} from '../src/graph-views.mjs';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl),pending=new Map(),errors=[],requests=[];let seq=0;
 await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
@@ -32,7 +33,7 @@ const profile=()=>run('Object.fromEntries([...document.querySelectorAll(".profil
 try{
   await mkdir('test-results',{recursive:true});await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000/'});await waitFor('!!document.querySelector(".explore-home")');
+  await send('Page.navigate',{url:appURL+'/'});await waitFor('!!document.querySelector(".explore-home")');
   await seed();await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');await click('[data-view="graph"]');
   assert.deepEqual(await run('[...document.querySelector("#graph-mode").options].map(o=>o.value)'),['accuracy','combined','movement']);
   const original=await stored(),recommendation=await run('document.querySelector(".next-check").dataset.nextConcept');
@@ -129,7 +130,7 @@ try{
     await run('document.querySelector(".graph-view-controls").scrollIntoView({block:"start"})');await snap('graph-view-'+mode+'-mobile');
   }
   // An actual second tab changes the preference and clears data in the first.
-  const {targetId}=await send('Target.createTarget',{url:'http://127.0.0.1:3000/'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
+  const {targetId}=await send('Target.createTarget',{url:appURL+'/'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
   for(let i=0;i<50;i++){if(await run('!!document.querySelector(".explore-home")',sessionId))break;await new Promise(r=>setTimeout(r,100));}
   await run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({...JSON.parse(localStorage.getItem('calculus-clinic-progress-v1')),graphMode:'combined',scoringPreferences:{includeSelfReports:true}}))`,sessionId);
   await waitFor('document.querySelector("#graph-mode").value==="combined"');

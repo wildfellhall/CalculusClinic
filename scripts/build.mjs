@@ -22,7 +22,7 @@ await writeFile('dist/data/questions.csv',csv(questions.map(q=>({...q,optionA:q.
 await writeFile('dist/data/concept-map.svg',drawGraph(graphLayout(concepts,relationships),units,{standalone:true}));
 const coverage=units.filter(u=>u.id).flatMap(u=>concepts.filter(c=>c.unit===u.id).map(c=>({cedTopic:c.cedTopic,conceptId:c.id,scope:c.scope,questionCount:questions.filter(q=>q.conceptId===c.id).length})));
 await writeFile('dist/data/coverage.csv',csv(coverage,['cedTopic','conceptId','scope','questionCount']));
-for(const file of ['app.mjs','core.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
+for(const file of ['app.mjs','core.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
 for(const file of ['index.html','styles.css'])await cp('src/'+file,'dist/'+file);
 await cp('public','dist',{recursive:true});
 await mkdir('dist/vendor/katex',{recursive:true});
@@ -37,4 +37,9 @@ await cp('node_modules/@vladmandic/face-api/dist/face-api.esm.js','dist/vendor/f
 await cp('node_modules/@vladmandic/face-api/LICENSE','dist/vendor/face-api/LICENSE');
 await mkdir('dist/models/face-expression',{recursive:true});
 for(const file of ['face_expression_model.bin','face_expression_model-weights_manifest.json'])await cp('node_modules/@vladmandic/face-api/model/'+file,'dist/models/face-expression/'+file);
+await mkdir('dist/vendor/pdf',{recursive:true});
+await cp('node_modules/pdf-lib/dist/pdf-lib.min.js','dist/vendor/pdf/pdf-lib.min.js');
+await cp('node_modules/pdf-lib/LICENSE.md','dist/vendor/pdf/pdf-lib-LICENSE.md');
+await cp('node_modules/@pdf-lib/fontkit/dist/fontkit.umd.min.js','dist/vendor/pdf/fontkit.umd.min.js');
+await cp('node_modules/@pdf-lib/fontkit/README.md','dist/vendor/pdf/fontkit-NOTICE.md');
 console.log(`Built ${concepts.length} concepts, ${relationships.length} typed relationships, ${questions.length} questions. All 111 CED topic references covered.`);

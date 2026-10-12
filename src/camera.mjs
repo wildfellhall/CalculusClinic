@@ -1,12 +1,13 @@
 import {calibrate,CALIBRATION_SAMPLES,MovementSummary} from './observations.mjs';
 import {ExpressionSummary,expressionLabel} from './expressions.mjs';
+import {CAMERA_CONSTRAINTS} from './camera-access.mjs';
 
 export class MovementCamera {
   constructor(onChange=()=>{}){
     this.onChange=onChange;this.stage='off';this.message='';this.generation=0;this.token=0;
     this.video=document.createElement('video');this.video.muted=true;this.video.autoplay=true;this.video.playsInline=true;
     this.video.setAttribute('aria-label','Mirrored camera preview');this.video.className='camera-preview';
-    this.active=false;this.key=null;this.allowed=false;this.progress=0;this.liveScore=null;
+    this.active=false;this.key=null;this.allowed=false;this.progress=0;this.liveScore=null;this.permissionDenied=false;
   }
   get setup(){return this.stage==='loading'||this.stage==='calibrating';}
   mount(host){if(host)host.append(this.video);}
@@ -22,13 +23,15 @@ export class MovementCamera {
   }
   async start(){
     if(this.stage!=='off'||!this.allowed)return;
+    this.permissionDenied=false;
     if(!isSecureContext||!navigator.mediaDevices?.getUserMedia||!globalThis.Worker||!globalThis.createImageBitmap||!globalThis.OffscreenCanvas){this.message='Camera measurements need a supported browser on HTTPS or localhost. Practice and check-ins still work.';this.notify();return;}
     const generation=++this.generation;
     this.stage='loading';this.message='Waiting for camera permission…';this.notify();
     try{
-      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:15,max:24}},audio:false});
+      const stream=await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
       if(generation!==this.generation){stream.getTracks().forEach(t=>t.stop());return;}
       this.stream=stream;
+      for(const track of stream.getVideoTracks())track.enabled=this.active;
       for(const track of stream.getTracks())track.addEventListener('ended',()=>{if(generation===this.generation)this.stop('Camera disconnected. Enable it again to recalibrate.');});
       this.video.srcObject=stream;await this.video.play();
       if(generation!==this.generation)return;
@@ -52,6 +55,7 @@ export class MovementCamera {
       this.worker.postMessage({type:'init'});
     }catch(error){
       if(generation!==this.generation)return;
+      this.permissionDenied=error.name==='NotAllowedError';
       this.stop(error.name==='NotAllowedError'?'Camera permission was not granted. Practice and emotion check-ins are still available.':error.name==='NotFoundError'?'No camera was found. Practice and emotion check-ins are still available.':'The camera could not be opened. Check that it is available, or continue without it.');
     }
   }
