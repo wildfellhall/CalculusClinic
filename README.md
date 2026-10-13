@@ -1,144 +1,143 @@
 # Calculus Clinic
 
-A local, student-facing AP Calculus ontology, dependency map and practice bank.
+Calculus Clinic is a mathematics learning workspace built around knowledge graphs. It connects concepts, practice results, and observations of the learning experience so a self-learner can identify strengths, investigate gaps, and choose what to try next.
 
-Run with Node.js 20 or later:
+## A connected view of mathematics
 
-```sh
-npm ci
-npm run dev
+Each node represents a concept group with explicit subskills, a learning objective, mathematical conditions, common misconceptions, and ten application-oriented questions. A solid arrow points **from a prerequisite to a concept that uses it**. Optional dashed edges show other mathematical relationships, such as generalization, approximation, or inverse operations.
+
+The graph can show one concept’s neighborhood, a unit and its immediate prerequisites, or the whole selected learning path. Selecting a node connects its place in the curriculum to its notes, questions, and recorded evidence.
+
+| Learning path | Concepts | Scope |
+| --- | ---: | --- |
+| Algebra I | 65 | Linear relationships, quadratics, exponential models, and foundations |
+| Algebra II | 86 | Advanced functions and algebra, including Algebra I prerequisites |
+| AP Calculus AB | 97 | Limits, derivatives, integrals, differential equations, and foundations |
+| AP Calculus BC | 127 | AB content plus parametric and polar calculus and infinite series |
+| Calculus subset | 15 | A focused Algebra I/II route into factoring-based algebraic limits |
+
+These paths share concepts and question identities. Switching paths preserves the evidence already collected for a shared node. The Calculus subset keeps the immediate experimental focus small; broader arithmetic review remains in the full courses.
+
+Calculus topics follow the AP AB/BC framework, and Algebra content is mapped to Texas TEKS. Prerequisite links are authored instructional judgments. They express useful dependencies without claiming that the standards prescribe a single learning sequence.
+
+![Calculus subset showing Algebra I and II prerequisites connected to algebraic limit techniques](screenshots/10-calculus-subset.png)
+
+## Practice that gradually fills the graph
+
+A diagnostic check uses ten questions for a concept. **All ten must be attempted, with at least eight latest answers correct, to pass.** Each answer receives an explanation, and questions have no deadline.
+
+The next recommendation follows the prerequisite graph and the most recent practice evidence:
+
+- An incomplete check resumes with its unanswered questions.
+- A passed check usually leads to an unfinished dependent concept.
+- A completed check below the threshold prompts a prerequisite check to investigate the gap.
+- At the end of a branch, the diagnostic explores another nearby unfinished concept.
+
+Passing a node never grants automatic credit to its prerequisites or dependents. Untested concepts remain unknown. Recommendations stay within the selected path, and learners can choose a different concept at any point.
+
+![An Algebra I practice question with formatted mathematics, answer choices, and an active-time counter](screenshots/08-algebra-practice.png)
+
+## What the mastery displays mean
+
+The graph offers three views of the same concepts. Darker fills indicate higher scores within the selected view; an unscored node remains visually distinct from a measured zero.
+
+| View | Node fill | Additional context |
+| --- | --- | --- |
+| **Accuracy** | Latest correct answers divided by all ten questions | Question coverage and diagnostic status |
+| **Accuracy + observations** | Accuracy with a bounded camera adjustment and, if enabled, a small check-in adjustment | A purple border represents facial change from the resting baseline |
+| **Camera estimates only** | An experimental expression index from camera observations | Estimated expression labels and available evidence |
+
+For the accuracy view, three correct answers with seven questions still untried fill a node to **30%**. In the answer history, that same record has **100% latest accuracy among attempted questions**. The graph includes question coverage so a small successful sample does not look like a completed check.
+
+Only the latest answer to each question contributes to the accuracy fill. Retrying a question cannot add duplicate credit; a later incorrect answer can lower the score. First-attempt accuracy and all-attempt accuracy remain separate history measures.
+
+The overall profile gives each scored concept equal weight. It shows the average and the number of concepts with evidence for Accuracy, Emotions, and Both. Missing camera observations are excluded from the camera average, so its coverage may differ from accuracy coverage.
+
+![A combined graph view showing adjusted fills, expression labels, facial-change borders, and the overall comparison profile](screenshots/11-mastery-comparison.png)
+
+*The populated screenshots use demonstration records to illustrate the displays.*
+
+### The scoring relationship
+
+Let **A** be accuracy as a fraction from 0 to 1. Camera observations supply:
+
+- **N:** the combined probability of fear, sadness, and anger.
+- **X:** excess facial movement occurring alongside those expression estimates, normalized from 0 to 1.
+- **S:** the average unpleasant strength of optional question-level check-ins, from 0 to 1. It is zero when their contribution is disabled or no check-ins are available.
+
+The current rules are:
+
+```text
+Camera adjustment = 0.15 × N + 0.05 × X
+Combined score    = 100 × A × (1 − camera adjustment − 0.02 × S)
+Camera-only score = 100 − 75 × N − 25 × X
 ```
 
-Open **http://localhost:3000**. Install the pinned math-rendering dependency once with `npm ci`; no API key, account or database is required. `PORT=3001 npm run dev` selects another port. The development server serves `dist`; run `npm run build` after source edits and refresh the page.
+Camera evidence can reduce answer credit by at most **20% of that credit**. Enabled check-ins can reduce it by at most another **2%**. For example, an accuracy fill of 80%, with N = 0.6 and X = 0.2, gives a combined score of 72% when check-ins are excluded. Without usable camera evidence or enabled check-ins, the combined score equals accuracy. The camera-only view stays unscored without sufficient camera evidence.
 
-## Content
+Happiness contributes positively to the separate sentiment summary; it does not add an accuracy bonus. **Answer correctness alone determines passing and diagnostic recommendations**, even when the combined display is lower.
 
-- **127 concept groups:** every one of the 111 AP Calculus BC topic references, plus 16 prerequisite groups.
-- **297 typed relationships:** directed instructional prerequisites and separately identified mathematical connections.
-- **1,270 original questions:** ten three-option questions per concept, with stable IDs, answer keys and explanations.
-- Shared AB/BC and BC-only topic labels; all prerequisites of the AB view stay within shared content or foundations.
-- Objectives, subskills, mathematical conditions, misconceptions, concrete first steps, representation tags and instructional support notes.
+### The small role of time
 
-Alignment uses College Board's current [Course and Exam Description](https://apcentral.collegeboard.org/media/pdf/ap-calculus-ab-and-bc-course-and-exam-description.pdf), checked October 11, 2026, including the [fall 2026 clarifications](https://apcentral.collegeboard.org/media/pdf/ap-calculus-ab-bc-course-and-exam-description-clarifications.pdf). Topic descriptions and assessment items are original. Prerequisite edges are authored teaching judgments, not College Board-mandated dependencies.
+The active-time counter pauses when practice loses visibility or focus and during camera calibration. Submitting an answer stops it before explanation reading.
 
-The granularity is **topic-level concept groups with explicit subskills**, not one node per atomic skill. Ten questions sample each group; they do not exhaust every subskill, provide psychometric calibration, or reproduce AP free-response assessment. Other first-year calculus curricula can differ from AP BC. Potential friction and support fields describe task design; they do not diagnose a learner's emotion or ability.
+A separate time-aware practice-mastery statistic gives a correct answer full credit through two minutes, then gradually reduces that credit to 97% at five minutes. Longer responses receive the same 97%; missing time records receive neutral full credit. This adjustment is capped at three percentage points for a concept. Timing does not change the three graph views or the 8/10 pass rule.
 
-## Views
+## How facial observations are implemented
 
-- **Explore:** a focused home page with search, a unit picker, and three starting points or recently practiced concepts. The top navigation keeps Explore, Graph, Practice, Progress and Settings available on desktop and mobile.
-- **Graph:** a dedicated workspace in the top navigation, with a concept picker and immediate-neighborhood, unit, or whole-curriculum views. Selecting nodes keeps you in the workspace; the selected concept’s notes and practice are available below the canvas. The whole-curriculum view retains pan/zoom when a node is selected.
-- **Concept map:** open a concept from Explore to see its immediate neighborhood. Map options expose the selected unit with its external prerequisites, the entire curriculum, other mathematical connections and SVG export. Pan, zoom, fit and keyboard selection remain available. Concept notes have their own view; additional concepts in the unit are collapsed by default.
-- **Concept table:** search all concepts and inspect objectives, scope, prerequisite IDs and first-attempt accuracy.
-- **Practice:** ten questions per concept with explanations, an active-time counter, no time limit, unattempted items first, and a review at the end. Progress and session counts are derived from the bank rather than fixed at five.
-- **Progress:** per-concept and per-question accuracy, with separate first, latest and all-attempt metrics. Practiced concepts appear by default; filters also show passed checks, concepts to review, checks in progress, all concepts, or those not yet tried.
-- **Settings:** export/import progress backups, download accuracy CSVs and curriculum artifacts, and delete saved practice data.
-- **Sources & how this works:** schema, relationship semantics, scope, data behavior and sources, accessible in the footer.
+Camera observations have two distinct components: measurements of facial movement and estimates from an expression classifier. They are attached to question attempts and summarized for the relevant concept.
 
-### Practice mastery on the graph
+### Movement relative to a resting face
 
-Every graph view shades nodes from pale mint to deeper green using **latest correct answers ÷ all available questions for that concept**, with the small timing adjustment below. For example, three latest correct answers in a ten-question concept produce 30% before that adjustment, even if only three questions have been tried. Unpracticed concepts have a separate neutral fill; a practiced 0% is distinct. Each node also shows its percentage and question coverage, with a color legend and an explanation available on the map. Selection uses an outline and leaves the mastery color intact.
+MediaPipe Face Landmarker supplies 17 selected facial blendshape coefficients, including inner and outer eyebrow raises, eyebrow lowering, eyelid closure and widening, jaw opening, lip compression, mouth-corner movement, and lip rounding.
 
-Saved attempts remain the source of truth. Mastery is derived from those records on load and after answers, retries, imports, and changes in another tab; no independent cached score can become stale. Retrying the same question does not add duplicate credit, and a later incorrect answer can lower the score. Backups preserve the underlying records, including older backups. Deleting practice data resets all node shading. Live graphs retain their pan/zoom when progress arrives from another tab.
+After camera permission, calibration automatically collects a short resting-face sample—about six seconds, requiring at least 30 usable samples over at least five seconds. Each coefficient’s median becomes its reference value. A noise allowance accounts for ordinary variation during calibration.
 
-The concept progress CSV includes `masteryScore` (0–1, blank if unpracticed), `correctnessScore` before timing, and `timingAdjustment` (the difference, also a 0–1 proportion). **Map options → Download this map** includes the current personal shading, node labels, and legend in the SVG. The public curriculum SVG stays neutral. This practice indicator describes performance on the question bank, not a validated measure of overall understanding.
+For each later sample, the change score averages the absolute departures from those reference values after subtracting the noise allowance, expressed on a 0–100 scale. Signed changes are retained for individual movements, so raising and lowering a feature remain distinguishable. The graph’s purple border reflects the concept’s average movement change.
 
-### Question timing
+Movement magnitude alone has no positive or negative emotional meaning. For the combined score, only movement above 20/100 contributes to **X**, scaled over the remaining 80 points and weighted by the simultaneous fear/sadness/anger probability.
 
-Each question has a quiet count-up timer, with no countdown, deadline, color warning, or automatic submission. It runs only while the unanswered question is displayed in Practice and its document/window is visible and focused. Leaving Practice or switching tabs/windows pauses it; returning to the same in-memory question resumes it. **Check answer** freezes the measured time, excluding explanation reading. The next question and an explicit new practice attempt start at zero. The timer does not announce every tick to screen readers.
+### Expression estimates and sentiment
 
-Submitted durations are stored as optional nonnegative integer `durationMs` values on attempts. They appear in the set review and question history, survive reloads and backup imports, and are included in attempt CSVs. Question CSVs include latest/average durations and timed-attempt counts; concept CSVs include the average and count. Unknown legacy durations are shown as **Not recorded**, excluded from time averages, and have no effect on existing mastery. Deleting practice data clears recorded durations and the active clock. An unsubmitted clock lives only in the current page session: reloading or starting a new set begins a new attempt rather than saving an unfinished timer.
+The face-api expression model estimates probabilities for **neutral, happiness, sadness, anger, fear, disgust, and surprise**. Calibration personalizes the movement reference; the expression classifier itself stays fixed.
 
-`src/timing.mjs` defines a deliberately small, uniform practice heuristic:
+A sample contributes to the expression summary only when its leading probability is at least 55% and exceeds the next-highest probability by at least 15 percentage points. Insufficient evidence stays unscored; an ambiguous aggregate is labeled **Mixed / uncertain**. Missing faces, multiple faces, and unusable frames do not become synthetic neutral observations.
 
-- Incorrect and unanswered questions earn no credit, regardless of speed.
-- A correct latest answer within **2 minutes** earns full credit. Faster responses earn no extra bonus.
-- Between **2 and 5 minutes**, correct-answer credit decreases linearly from 1 to 0.97.
-- At **5 minutes or longer**, correct-answer credit stays at **0.97**.
-- Missing response time receives neutral full credit for a correct answer.
+The camera sentiment summary uses:
 
-Concept mastery is the sum of these latest-answer credits divided by all questions available. Timing therefore changes mastery by **at most 3 percentage points**: ten slow correct answers yield 97%; eight slow correct answers yield 77.6%. These time ranges are transparent initial defaults, not calibrated question-difficulty benchmarks. First/latest/all-attempt accuracy remains based solely on correctness, and the diagnostic still passes eight correct out of ten with all ten tried, regardless of time. Timing does not change diagnostic routing or the choice of prerequisites to check.
+```text
+Sentiment = 100 × (P(happiness) − P(fear) − P(sadness) − P(anger))
+```
 
-### Diagnostic next checks
+Movement and expression summaries are saved with answers. Concept-level camera summaries weight each saved attempt by its usable sample count, including retries. This differs from accuracy, which uses only the latest answer per question.
 
-A concept passes when **all ten questions have been tried and at least eight latest answers are correct**. `src/diagnostic.mjs` derives four states from saved answers: `unseen`, `partial`, `passed`, and `review`. Repeated answers do not count as new questions, and a later wrong answer can revoke a pass. Passing a node does not award credit to untested prerequisites or dependents.
+These are experimental indicators for reflection. Facial expressions do not establish a person’s felt emotion or mathematical understanding. Frustration and confusion are available through voluntary reflections; they are not output classes of the camera model.
 
-The next check uses actual prerequisite edges and recent answer timestamps:
+![Concept observations separating camera expression estimates, self-reported sentiment, and change from the resting-face baseline](screenshots/12-camera-observations.png)
 
-- Resume the most recently started incomplete concept before branching. **Continue check** presents only its unanswered questions; a regular practice set still offers all ten.
-- After a pass, recommend an unfinished dependent of the most recently passed concept. Search through already-passed dependents when needed. Prefer returning to a recorded dependent gap when its prerequisite has just passed.
-- After a completed result below 8/10, check an unresolved prerequisite. Follow known prerequisite gaps backward until reaching an untested or partial concept, or a gap with no further unresolved prerequisites.
-- If a gap is isolated at the end of a prerequisite chain, keep its review status and sample another unfinished branch instead of forcing immediate repeated checks. When a passed branch has no unfinished dependents, explore a nearby unfinished concept.
-- Respect the chosen AB/BC course, ignore non-prerequisite relationship types for routing, and stop recommending new checks when every eligible concept has passed.
+## Reflection alongside performance
 
-One recommendation appears after a check, in Practice, on the graph, and on Explore after practice has begun. It includes a reason, a button to start or continue, and **Show on graph**. A purple **Next check** label marks the target without changing its mastery fill. Diagnostic status labels appear on nodes and in Progress; the concept progress CSV includes `diagnosticStatus`. Students can choose any other concept at any time.
+Question-level emotion check-ins let learners record an emotion, its intensity, and whether it felt pleasant, neutral, or unpleasant. Their scoring contribution is **off by default**. If enabled, unpleasant intensity divided by five enters the small check-in adjustment; pleasant and neutral responses contribute zero. These check-ins never enter the camera-only score.
 
-For example: passing 1.11 (continuity at a point) leads to 1.12 (continuity on an interval). A lower complete result on 1.12 leads to checking 1.5 (limit laws) if that prerequisite is untested. Passing 1.5 brings the recommendation back to the recorded gap at 1.12. This is an explicit practice-routing heuristic, not a calibrated adaptive assessment.
+After a ten-question set, a separate progress survey asks about perceived ease, progress through the material, and feelings such as confusion, frustration, focus, or confidence. An optional note captures what helped or remains unclear. These end-of-set reflections do not change mastery scores or diagnostic decisions.
 
-Recommendations and statuses are reconstructed from saved attempts after reload, import, or another tab's updates. Existing backups work without migration, and deleting history clears the diagnostic. No separate route cache or additional personal data is stored.
+![The progress survey with ease and progress ratings, multiple feelings, and an optional note](screenshots/13-progress-check.png)
 
-## Data files
+## Learner control and continuity
 
-The build writes these reproducible artifacts:
+Onboarding introduces the selected path, explains the practice workflow, and requests camera permission before calibration. Camera use can be skipped or disabled in Settings. Question observations are collected during active, unanswered practice; calibration itself does not count as question evidence.
 
-| File | Contents |
+Camera processing stays on the device. Saved observations contain numeric summaries, probabilities, sample counts, and a reference identifier. Images, video, audio, and the resting-face reference itself are not saved. Learners can delete their stored practice data in Settings.
+
+Scores are derived from saved evidence rather than maintained as independent totals. Shared concepts keep their practice history across courses, and narrowing a subset preserves earlier records. Ten-question checks sample a concept’s skills; they are not a validated measure of complete mastery.
+
+## Where the model lives
+
+| Responsibility | Implementation |
 | --- | --- |
-| `dist/data/concepts.csv` | Concept IDs, units, scope, objectives, subskills, rules, prerequisites, dependents, support and source references |
-| `dist/data/relationships.csv` | Source, target, relationship type, rationale and provenance |
-| `dist/data/questions.csv` | Question and concept IDs, version, prompt, option IDs/text, correct option and explanation |
-| `dist/data/coverage.csv` | All official topic references and associated question counts |
-| `dist/data/ontology.json` | Complete structured ontology, bank and metadata |
-| `dist/data/concept-map.svg` | Standalone vector graph with every node and relationship |
-
-Concept IDs match topic references (`1.11`, `10.15`) or foundation identifiers (`F01`). Question IDs add a stable suffix, such as `1.11-Q1`; option IDs remain stable when display order changes. List-valued CSV fields use semicolons. CSV uses quoted UTF-8 fields and a BOM for spreadsheet compatibility. Formula-like leading text is escaped with an apostrophe for safe spreadsheet import; JSON preserves original mathematical text without that escaping.
-
-Bank release **1.1.0** adds Q6–Q10 for every group in the six `data/questions-*-extra.mjs` files. Original Q1–Q5 records retain item version 1.0.0 and unchanged prompts, choices, answer keys and IDs. New items use version 1.1.0. Existing stored attempts and older backups remain valid; new unanswered questions expand coverage without lowering first/latest accuracy. A snapshot check protects all 635 original records.
-
-Edit the authored curriculum in `data/curriculum.mjs` and questions in the grouped `data/questions-*.mjs` files. `data/questions.mjs` parses the source and rotates option positions reproducibly. Do not recycle existing question IDs for different questions without a bank-version change and a progress migration plan.
-
-## Progress storage and accuracy
-
-Attempts live in this browser's `localStorage` under `calculus-clinic-progress-v1`, scoped to the current origin. `localhost`, `127.0.0.1` and a future hosted URL each have separate storage. There is no network submission or cross-device synchronization. Export/import a backup to move records.
-
-Each attempt records `id`, `questionId`, `conceptId`, `bankVersion`, `choiceId`, `correct`, `answeredAt` (UTC ISO timestamp), `sessionId`, and optional `durationMs` (active response time). The attempt field `bankVersion` retains the version of the individual question. An answer is recorded once when **Check answer** is pressed; reopening a question creates a review attempt. Existing schema-version-1 backups without durations remain compatible; invalid negative, fractional, nonnumeric, or unsafe durations are rejected before import.
-
-- **First-attempt accuracy:** first correct answers / distinct questions attempted.
-- **Latest accuracy:** latest correct answers / distinct questions attempted.
-- **All-attempt accuracy:** all correct attempts / all attempts, including retries.
-- No attempts produces an unscored value, not 0%.
-- Accuracy exports use proportions from 0 to 1. A blank represents no attempts.
-
-The UI exports concept accuracy, question accuracy, every attempt, or a JSON backup. Imports accept compatible version-1.0 and version-1.1 backups, validate question/option IDs and item versions, recalculate correctness from the current answer key, and merge by attempt ID. Invalid backups leave existing progress untouched. Browser storage failures produce a visible message and preserve current-session attempts for export.
-
-**Settings → Delete my practice data** opens a confirmation dialog. Confirming removes only the app's storage key, clears its in-memory attempts and current practice set, and resets accuracy to unscored. Other tabs on the same origin also clear their history and active practice. Cancel or Escape keeps everything. Deletion also handles unreadable saved data; if browser storage refuses deletion, the history remains available and an error is shown. A pending backup import cannot restore records after deletion. Downloaded backups and records on other origins/devices are unaffected; importing a backup later can restore its attempts.
-
-## Validation
-
-```sh
-npm run check
-```
-
-This builds all artifacts and runs 114 tests covering curriculum completeness, ten-item coverage, original-question compatibility, graph integrity, AB prerequisite closure, SVG generation, CSV escaping, accuracy and mastery semantics, backup validation/merging and independent numerical spot checks. Mastery checks include coverage, retries, legacy backups, color lightness, text contrast, selection, exports, and card layout. Diagnostic checks cover the pass threshold, incomplete evidence, chronological anchors, forward routing, prerequisite tracing, branch changes, pass revocation, course scope, persistence, and completion. Timing checks cover the small bounded adjustment, rounding, neutral legacy data, validation/round trips, unchanged passing, time summaries, and monotonic pause/resume/reset behavior. Math checks cover grouping, fractions with function denominators, roots, powers, integral and sum bounds, one-sided limits, vectors, prose boundaries, accessibility markup, escaping, and strict compilation of every authored math field.
-
-`scripts/browser-check.mjs` is an additional local Chrome integration test. It expects the server on port 3000 and an **isolated** headless Chrome profile on debugging port 9224. It checks desktop/mobile rendering, top navigation, dedicated graph navigation and selection, viewport preservation, search, filtering, concept notes, all map scopes, ten-question completion, quiz feedback, retries, persistence, legacy-backup import, backup round trips and artifact downloads. Mastery checks cover distinct shades, actual answers, coverage, reloads, personal SVG exports, mobile label bounds, and cross-tab retries while a practice set is paused behind the graph. Deletion checks cover confirmation, cancellation, Escape, focus, storage failures, unrelated-data preservation, cross-tab reset, reload, pending imports and corrupt records. Never point it at a personal Chrome profile: the test clears the app's storage in its test page. Screenshots go to ignored `test-results/`.
-
-`scripts/browser-diagnostic-check.mjs` uses the same isolated setup and exercises an actual diagnostic journey: partial completion and reload, answering only the remaining questions, passing and advancing, finding a gap and testing its prerequisite, returning to the gap, status filters, CSV/backup exports, cross-tab pass revocation, deletion, backup restoration, and mobile layout.
-
-`scripts/browser-timing-check.mjs` verifies real ticking, pausing outside Practice and in another browser tab, stopping on submission, new-question/retry resets, absence of a deadline, time history, CSV and backup round trips, time-adjusted graph shading, unchanged accuracy/passing, invalid-time rejection, neutral legacy imports, deletion, and mobile layout. It advances a test-only monotonic clock to cover long answers without waiting minutes. Run the browser scripts sequentially on the isolated profile.
-
-`scripts/browser-math-check.mjs` typesets every authored math field in a narrow browser fixture and checks actual practice, completion review, notes, history and graph screens. It verifies MathML, local fonts, desktop/mobile layout, keyboard access to long formulas, and saved answers. It uses the same isolated browser setup.
-
-## Future deployment
-
-`vercel.json` is included for a future static deployment: `npm run build` produces `dist`. This task does not deploy anything to Vercel or Sites. Hosting does not create shared storage; a future authenticated backend would be a separate feature. Font assets and their OFL licenses are local in `public/fonts`, so the application works without third-party font requests.
-
-## Implementation
-
-Vanilla JavaScript modules, CSS and SVG, with locally served [KaTeX](https://katex.org/docs/api.html) for mathematics. A mint (`#DDFEEA`) and pastel palette, locally hosted Fraunces/Nunito fonts, even-width rounded borders, dashed decorative trim and a small mathematical curve illustration. No raised borders, shadows, gradients or icon libraries.
-
-### Math formatting
-
-`scripts/math-format.mjs` converts the bank's plain-text notation into display segments during the build and validates every formula with strict KaTeX parsing. It recognizes the notation used in this bank, including fractions, radicals, absolute values, powers and indices, derivative primes, definite integrals, limit directions, indexed sums, vectors and intervals. It is a display parser, not a symbolic algebra system. Future content can use explicit `$...$` LaTeX for notation outside its supported grammar; add a grouping regression test when extending the grammar.
-
-`src/math.mjs` typesets visible segments with cached HTML and semantic MathML; prose keeps the site's display/body fonts. Questions, choices, feedback, concept notes, completed-set reviews and question history share the renderer. Long formulas scroll inside their line and become keyboard focusable when necessary. Graph SVG labels and native select options keep compact plain-text labels. Raw question records, IDs, versions, answer keys and CSV/JSON exports remain unchanged, preserving existing saved attempts.
-
-The build copies the pinned KaTeX module, CSS, fonts and MIT license into `dist/vendor/katex/`; there are no CDN requests or rendering-service calls. KaTeX runs with `trust: false`, and prose is HTML escaped.
+| Concepts, relationships, and focused subsets | [Curriculum catalog](data/catalog.mjs), [subset definitions](data/subsets.mjs) |
+| Passing and next-concept recommendations | [Diagnostic rules](src/diagnostic.mjs) |
+| Score weights and graph comparisons | [Scoring policy](src/score-policy.mjs), [graph views](src/graph-views.mjs) |
+| Resting-face calibration and movement summaries | [Observation model](src/observations.mjs) |
+| Expression probabilities, labels, and sentiment | [Expression model](src/expressions.mjs) |
+| End-of-set reflections | [Progress checks](src/progress-checks.mjs) |
