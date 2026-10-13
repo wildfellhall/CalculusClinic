@@ -52,6 +52,15 @@ test('Historical sets remain valid when their question wording is retired',()=>{
  attempts[0]={...attempts[0],questionId:old.id,bankVersion:old.version,choiceId:old.correctOptionId,correct:true};
  assert.deepEqual(validateProgressChecks([check],validateAttempts(attempts,attemptQuestions),concepts),[check]);
 });
+test('Shrinking a subset preserves earlier surveys without resurfacing removed concepts in its history',()=>{
+ for(const id of ['MATH_001','MATH_034','F03']){
+  const {attempts,check}=fixture(id,'CALC_SUBSET');
+  for(const saved of [check,completed(check)]){
+   assert.deepEqual(validateProgressChecks([saved],validateAttempts(attempts,attemptQuestions),concepts),[saved]);
+   assert.equal(renderProgressCheckHistory([saved],concepts,'CALC_SUBSET'),'');
+  }
+ }
+});
 test('Merging is idempotent, preserves completed responses and upgrades an unfinished check',()=>{
  const {check}=fixture(),done=completed(check),skipped={...check,status:'skipped'};
  assert.deepEqual(mergeProgressChecks([done],[done,check,skipped]),[done]);

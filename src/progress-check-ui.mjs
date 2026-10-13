@@ -1,4 +1,5 @@
 import {escapeHTML as esc} from './graph.mjs';
+import {courseIncludes} from './course.mjs';
 import {EASE_LABELS,PROGRESS_LABELS,FEELINGS,NOTE_LIMIT} from './progress-checks.mjs';
 
 const rating=(c,name,title,labels)=>`<fieldset class="reflection-field"><legend>${title}</legend><div class="reflection-scale">${labels.map((label,i)=>`<label><input type="radio" name="${name}" value="${i+1}" ${c[name]===i+1?'checked':''} required><span><strong>${i+1}</strong><span>${label}</span></span></label>`).join('')}</div></fieldset>`;
@@ -14,8 +15,8 @@ export function renderCheckResponse(c){
  return `<dl class="reflection-response"><div><dt>Ease</dt><dd>${c.ease?`${c.ease}/5 · ${EASE_LABELS[c.ease-1]}`:'—'}</dd></div><div><dt>Progress</dt><dd>${c.progress?`${c.progress}/5 · ${PROGRESS_LABELS[c.progress-1]}`:'—'}</dd></div><div><dt>Feelings</dt><dd>${c.feelings.length?c.feelings.map(f=>FEELINGS[f]).join(', '):'—'}</dd></div></dl>${c.note?`<p class="reflection-saved-note">${esc(c.note)}</p>`:''}`;
 }
 export function renderProgressCheckHistory(checks,concepts,course){
- const list=checks.filter(c=>c.course===course).sort((a,b)=>b.completedAt.localeCompare(a.completedAt));
- if(!list.length)return '';
  const byId=new Map(concepts.map(c=>[c.id,c]));
+ const list=checks.filter(c=>c.course===course&&courseIncludes(course,byId.get(c.conceptId))).sort((a,b)=>b.completedAt.localeCompare(a.completedAt));
+ if(!list.length)return '';
  return `<details class="progress-check-history"><summary>Progress checks <span>${list.filter(c=>c.status==='completed').length} saved${list.some(c=>c.status==='pending')?' · unfinished checks':''}</span></summary><div class="reflection-history-list">${list.map(c=>`<details data-progress-check="${esc(c.id)}"><summary><span>${esc(byId.get(c.conceptId).title)}</span><time datetime="${c.completedAt}">${new Date(c.completedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</time><span class="reflection-status">${c.status==='completed'?'Saved':c.status==='pending'?'Unfinished':'Skipped'}</span></summary>${renderCheckResponse(c)}${c.status!=='completed'?`<button class="button compact" data-action="resume-progress-check" data-id="${esc(c.id)}">Finish progress check</button>`:''}</details>`).join('')}</div><button class="text-link" data-action="export-progress-checks">Download progress checks · CSV</button></details>`;
 }

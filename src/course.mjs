@@ -4,7 +4,7 @@ export const COURSES={
   ALG2:{title:'Algebra II',shortTitle:'Algebra II',monogram:'II',entryId:'MATH_061',startingIds:['MATH_061','MATH_066','MATH_077'],description:'Functions, logarithms, advanced systems, and rational expressions, with Algebra I prerequisites.'},
   AB:{title:'AP Calculus AB',shortTitle:'AB',monogram:'AB',entryId:'1.2',startingIds:['1.2','2.2','6.3'],description:'Limits, derivatives, integrals, and differential equations.'},
   BC:{title:'AP Calculus BC',shortTitle:'BC',monogram:'BC',entryId:'1.2',startingIds:['1.2','2.2','6.3'],description:'Everything in AB, plus parametric and polar calculus and infinite series.'},
-  CALC_SUBSET:{title:'Calculus subset',shortTitle:'subset',monogram:'lim',kind:'subset',targetId:'1.6',entryId:'1.6',startingIds:['1.6','MATH_057','MATH_082'],description:'Factoring-based limits, with connected Algebra I, Algebra II, and earlier prerequisites.'}
+  CALC_SUBSET:{title:'Calculus subset',shortTitle:'subset',monogram:'lim',kind:'subset',targetId:'1.6',entryId:'1.6',startingIds:['1.6','MATH_057','MATH_082'],description:'A focused path from Algebra I and Algebra II to factoring-based limits.'}
 };
 export const courseTitle=course=>COURSES[course]?.title??course;
 export function courseIncludes(course,concept){

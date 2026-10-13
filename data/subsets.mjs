@@ -4,19 +4,18 @@
 export const SUBSETS={
   CALC_SUBSET:{
     targetId:'1.6',
+    // A bounded experimental path. Broad foundation groups stand in for the
+    // earlier arithmetic chain; full courses retain their complete ontology.
+    conceptIds:[
+      'MATH_025','MATH_030','MATH_056','MATH_057','MATH_058',
+      'MATH_080','MATH_081','MATH_082',
+      'F01','F02','F04','F05','1.2','1.5','1.6'
+    ],
     bridges:[
-      ['MATH_015','F01','Use signed fraction arithmetic when simplifying expressions.'],
-      ['MATH_022','F01','Apply integer exponent laws to algebraic expressions.'],
       ['MATH_058','F01','Use radical and rational-power rules with their real-domain restrictions.'],
       ['MATH_057','F02','Factor trinomials and differences of squares before cancelling common factors.'],
       ['MATH_081','F02','Factor higher-degree expressions, including differences of cubes.'],
       ['MATH_082','F02','Simplify rational expressions without restoring excluded inputs.'],
-      ['MATH_034','F03','Solve linear equations to locate zeros and excluded inputs.'],
-      ['MATH_036','F03','Solve inequalities and express sign conditions as intervals.'],
-      ['MATH_061','F03','Find quadratic roots to divide a sign chart into intervals.'],
-      ['MATH_044','F04','Evaluate function notation by substituting into the input expression.'],
-      ['MATH_049','F04','Interpret allowed inputs and outputs before extending domain reasoning to other function families.'],
-      ['MATH_051','F05','Read shifts, reflections and stretches before interpreting transformed and piecewise graphs.'],
       // Retain direct skill-to-application links as well as the broader F02
       // review group, making the Algebra I/II route visible at the target node.
       ['MATH_057','1.6','Factor a quadratic numerator or denominator to remove a shared zero factor near the limit point.'],
@@ -34,10 +33,16 @@ export function assembleSubsets(concepts,relationships,definitions=SUBSETS){
   })));
   const edges=[...relationships,...bridges];
   for(const [course,subset] of Object.entries(definitions)){
+    const bounds=subset.conceptIds?new Set(subset.conceptIds):null;
+    if(bounds){
+      for(const id of bounds)if(!byId.has(id))throw new Error(`Unknown subset concept: ${id}`);
+      if(!bounds.has(subset.targetId))throw new Error(`Subset must include target: ${subset.targetId}`);
+    }
     const parents=new Map(concepts.map(c=>[c.id,[]]));
     for(const e of edges){
       if(e.courses&&!e.courses.includes(course))continue;
       if(!byId.has(e.source)||!byId.has(e.target))throw new Error(`Unknown subset endpoint: ${e.source} → ${e.target}`);
+      if(bounds&&(!bounds.has(e.source)||!bounds.has(e.target)))continue;
       if(e.type==='prerequisite')parents.get(e.target).push(e.source);
     }
     const visited=new Set(),visiting=new Set();
@@ -50,6 +55,7 @@ export function assembleSubsets(concepts,relationships,definitions=SUBSETS){
       visiting.delete(id);visited.add(id);memberships.get(id).push(course);
     }
     visit(subset.targetId);
+    if(bounds)for(const id of bounds)if(!visited.has(id))throw new Error(`Subset concept does not lead to ${subset.targetId}: ${id}`);
     for(const e of bridges.filter(e=>e.courses.includes(course)))if(!visited.has(e.source)||!visited.has(e.target))throw new Error(`Subset bridge does not lead to ${subset.targetId}: ${e.source} → ${e.target}`);
   }
   return {concepts:concepts.map(c=>({...c,subsets:memberships.get(c.id)})),relationships:edges};

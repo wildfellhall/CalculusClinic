@@ -28,7 +28,10 @@ export function validateProgressChecks(value,attempts,concepts){
   if(!c||typeof c!=='object'||typeof c.id!=='string'||!c.id.length||c.id.length>100||seen.has(c.id))throw new Error('A progress check has an invalid or duplicate ID.');
   seen.add(c.id);
   const concept=byConcept.get(c.conceptId);
-  if(!concept||!Object.hasOwn(COURSES,c.course)||!courseIncludes(c.course,concept))throw new Error('A progress check has an unknown concept or course.');
+  // A subset can shrink after a survey is saved. Its recorded course describes
+  // where the check happened, not current membership. Keep that history valid;
+  // active practice and course views still enforce current concept membership.
+  if(!concept||!Object.hasOwn(COURSES,c.course)||(COURSES[c.course].kind!=='subset'&&!courseIncludes(c.course,concept)))throw new Error('A progress check has an unknown concept or course.');
   if(!Array.isArray(c.attemptIds)||c.attemptIds.length!==10||new Set(c.attemptIds).size!==10)throw new Error('A progress check must link ten distinct answers.');
   const linked=c.attemptIds.map(id=>byAttempt.get(id));
   if(linked.some(a=>!a||a.conceptId!==c.conceptId)||new Set(linked.map(a=>a.questionId)).size!==10)throw new Error('A progress check has missing or mismatched answers.');

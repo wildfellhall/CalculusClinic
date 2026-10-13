@@ -89,7 +89,7 @@ test('Reports and generated course downloads exclude unrelated courses and retai
  // This integration test builds its own artifacts, so npm test also works from a fresh checkout.
  await import('../scripts/build.mjs');
  const attempts=[...set(34,8),...set(78,6)];
- for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127],['CALC_SUBSET',59]]){
+ for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127],['CALC_SUBSET',15]]){
   const report=reportData({...catalog,course,attempts});assert.equal(report.rows.length,count);assert.equal(report.profile.total,count);
   const exported=JSON.parse(await readFile(`dist/data/${course.toLowerCase()}/ontology.json`,'utf8'));
   assert.equal(exported.concepts.length,count);assert.equal(exported.questions.length,count*10);assert.equal(exported.metadata.title,COURSES[course].title);

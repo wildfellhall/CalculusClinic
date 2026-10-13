@@ -19,16 +19,16 @@ const answers=(id,correct=8,day=12)=>catalog.questions.filter(q=>q.conceptId===i
  answeredAt:new Date(Date.UTC(2026,9,day,12,i)).toISOString(),sessionId:`${day}-${id}`,durationMs:60000
 }));
 
-test('The subset is exactly the target prerequisite closure, including both Algebra courses',()=>{
- assert.equal(COURSES[course].targetId,SUBSETS[course].targetId);assert.equal(nodes.length,59);
+test('The subset has 15 selected concepts, each leading to the target, including both Algebra courses',()=>{
+ assert.equal(COURSES[course].targetId,SUBSETS[course].targetId);assert.equal(nodes.length,15);assert.deepEqual(ids,new Set(SUBSETS[course].conceptIds));
  const ancestry=new Set();function visit(id){if(ancestry.has(id))return;ancestry.add(id);for(const e of edges.filter(e=>e.type==='prerequisite'&&e.target===id))visit(e.source);}
- visit(target);assert.deepEqual(ancestry,ids);assert.equal(topologicalOrder(nodes,edges).length,59);
+ visit(target);assert.deepEqual(ancestry,ids);assert.equal(topologicalOrder(nodes,edges).length,15);
  for(const c of nodes){
   assert.ok(c.prerequisites.every(id=>ids.has(id)),c.id);
   assert.equal(catalog.questions.filter(q=>q.conceptId===c.id).length,10,c.id);
  }
  for(const id of ['MATH_057','MATH_058','MATH_081','MATH_082','F02','1.2','1.5'])assert.ok(ids.has(id));
- for(const id of ['MATH_078','1.7','2.1','6.1','10.1'])assert.ok(!ids.has(id));
+ for(const id of ['MATH_001','MATH_034','F03','MATH_078','1.7','2.1','6.1','10.1'])assert.ok(!ids.has(id));
  assert.equal(edges.filter(e=>e.type==='prerequisite'&&e.source===target).length,0);
 });
 test('Subset definitions reject dangling dependencies, cycles, and disconnected bridges',()=>{
@@ -37,6 +37,15 @@ test('Subset definitions reject dangling dependencies, cycles, and disconnected 
  assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'b',bridges:[['missing','b','reason']]}}),/Unknown subset endpoint/);
  assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'b',bridges:[['a','b','reason'],['b','a','reason']]}}),/Cyclic/);
  assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'c',bridges:[['a','b','reason']]}}),/does not lead/);
+ assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'b',conceptIds:['a'],bridges:[]}}),/must include target/);
+ assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'b',conceptIds:['b','missing'],bridges:[]}}),/Unknown subset concept/);
+ assert.throws(()=>assembleSubsets(concepts,[],{X:{targetId:'b',conceptIds:['a','b'],bridges:[]}}),/does not lead/);
+});
+test('A bounded subset stops at selected foundations rather than expanding their entire ancestry',()=>{
+ const concepts=[{id:'a'},{id:'b'},{id:'c'}],relationships=[{source:'a',target:'b',type:'prerequisite'},{source:'b',target:'c',type:'prerequisite'}];
+ const subset=assembleSubsets(concepts,relationships,{X:{targetId:'c',conceptIds:['b','c'],bridges:[]}});
+ assert.deepEqual(subset.concepts.map(c=>c.subsets),[[],['X'],['X']]);
+ assert.deepEqual(subset.relationships,relationships,'Full ontology edges remain intact');
 });
 test('Cross-course links appear in node prerequisites and mixed graphs, but never alter the full courses',()=>{
  for(const [source,destination] of SUBSETS[course].bridges){
@@ -53,7 +62,7 @@ test('Cross-course links appear in node prerequisites and mixed graphs, but neve
 });
 test('Onboarding offers the subset, counts its concepts, and persists its selection',()=>{
  const html=renderOnboarding({step:'course',course:'BC',concepts:catalog.concepts});
- assert.match(html,/Choose Calculus subset/);assert.match(html,/Experimental subset · 59 concepts/);
+ assert.match(html,/Choose Calculus subset/);assert.match(html,/Experimental subset · 15 concepts/);
  const values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)};
  assert.equal(saveCourse(storage,course),true);assert.equal(readCourse(storage),course);
  assert.equal(courseIncludes(course,catalog.concepts.find(c=>c.id===target)),true);
@@ -72,11 +81,11 @@ test('Diagnostics start at limits, retain 8/10 passing, and route through cross-
 });
 test('Shared mastery survives course changes; outside attempts do not affect subset profiles or reports',()=>{
  const attempts=[...answers(target),...answers('MATH_057'),...answers('MATH_082',7),...answers('10.1',10,14),...answers('MATH_078',10,15)];
- const d=diagnose(attempts);assert.equal(d.nodes.size,59);assert.notEqual(d.latestId,'MATH_078');
+ const d=diagnose(attempts);assert.equal(d.nodes.size,15);assert.notEqual(d.latestId,'MATH_078');
  for(const [id,path] of [[target,'AB'],[target,'BC'],['MATH_057','ALG1'],['MATH_082','ALG2']])assert.equal(d.nodes.get(id).correctnessScore,diagnose(attempts,path).nodes.get(id).correctnessScore);
- const report=reportData({...catalog,course,attempts});assert.equal(report.profile.total,59);assert.equal(report.attemptCount,30);
- assert.equal(report.rows.length,59);assert.ok(report.weak.some(r=>r.concept.id==='MATH_082'));assert.ok(report.strengths.some(r=>r.concept.id===target));
- for(const view of Object.values(report.views))assert.equal(view.size,59);
+ const report=reportData({...catalog,course,attempts});assert.equal(report.profile.total,15);assert.equal(report.attemptCount,30);
+ assert.equal(report.rows.length,15);assert.ok(report.weak.some(r=>r.concept.id==='MATH_082'));assert.ok(report.strengths.some(r=>r.concept.id===target));
+ for(const view of Object.values(report.views))assert.equal(view.size,15);
  assert.ok(report.map.edges.some(e=>e.source==='MATH_082'&&e.target===target));
  assert.ok(report.rows.find(r=>r.concept.id===target).concept.prerequisites.includes('MATH_057'));
 });
