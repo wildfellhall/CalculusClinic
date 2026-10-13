@@ -39,7 +39,7 @@ try{
    terminate(){this.ended=true;}
   };`});
  await load('Page.navigate',{url:appURL});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});
- assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),4);assert.equal(await run('qaMediaCalls'),0);assert.equal(await choice(),undefined);await snap('onboarding-courses');
+ assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),5);assert.equal(await run('qaMediaCalls'),0);assert.equal(await choice(),undefined);await snap('onboarding-courses');
  await run(`document.querySelector('[data-course="AB"]').focus()`);
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter'});
  await waitFor('!!document.querySelector(".onboarding-tutorial")');assert.equal(await choice(),'AB');assert.equal(await run('qaMediaCalls'),0);

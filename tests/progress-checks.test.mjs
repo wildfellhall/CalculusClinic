@@ -14,7 +14,7 @@ const fixture=(id='1.11',course='BC')=>{
 const completed=c=>({...c,status:'completed',ease:2,progress:4,feelings:['confused','focused'],note:'Factoring helped.',submittedAt:'2026-10-13T12:11:00.000Z'});
 
 test('A progress check follows ten answers in every course, never an unfinished set',()=>{
- for(const [id,course] of [['MATH_034','ALG1'],['MATH_078','ALG2'],['1.11','AB'],['10.1','BC']]){
+ for(const [id,course] of [['MATH_034','ALG1'],['MATH_078','ALG2'],['1.11','AB'],['10.1','BC'],['1.6','CALC_SUBSET'],['MATH_082','CALC_SUBSET']]){
   const {quiz,attempts,check}=fixture(id,course);
   assert.equal(check.status,'pending');assert.equal(check.course,course);assert.equal(check.attemptIds.length,10);
   assert.deepEqual(validateProgressChecks([check],validateAttempts(attempts,attemptQuestions),concepts),[check]);

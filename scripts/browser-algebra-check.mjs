@@ -28,7 +28,7 @@ try{
  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
  await send('Storage.clearDataForOrigin',{origin:appURL,storageTypes:'local_storage'});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA camera denied','NotAllowedError')};`});
- await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),4);await snap('algebra-onboarding');
+ await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),5);await snap('algebra-onboarding');
  await click('[data-course="ALG1"]');await finishOnboardingWithoutCamera(run,waitFor);await waitFor('!!document.querySelector(".explore-home")');assert.equal(await choice(),'ALG1');assert.match(await run('document.querySelector("h1").textContent'),/algebra/);await snap('algebra-home');
  await click('[data-view="practice"]');assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');assert.equal(await run('document.querySelector("#practice-concept").options.length'),65);
  await click('[data-action="diagnostic"]');for(let i=0;i<3;i++)await answerNext(true);

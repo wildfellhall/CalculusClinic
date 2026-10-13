@@ -1,6 +1,7 @@
 import {diagnosticState} from './diagnostic.mjs';
 import {graphViewProgress,graphProfile} from './graph-views.mjs';
 import {normalizeScoringPreferences,SCORE_POLICY} from './score-policy.mjs';
+import {courseConcepts,relationshipInCourse} from './course.mjs';
 
 export const REPORT_VIEWS=[['accuracy','Accuracy'],['movement','Emotions'],['combined','Both']];
 export const reportScore=value=>Number.isFinite(value)?Number((value*100).toFixed(1)).toString():'Not recorded';
@@ -10,7 +11,7 @@ const mean=values=>values.length?values.reduce((a,b)=>a+b,0)/values.length:null;
 export function reportData({concepts,relationships,questions,attempts,course='BC',preferences,mapIds=null,mapEdges=relationships,mapFocus=null,mapLabel='Whole curriculum',generatedAt=new Date().toISOString()}){
   preferences=normalizeScoringPreferences(preferences);
   const diagnostic=diagnosticState({concepts,relationships,questions,attempts,course});
-  const eligible=concepts.filter(c=>diagnostic.nodes.has(c.id));
+  const eligible=courseConcepts(course,concepts,relationships);
   const views=Object.fromEntries(REPORT_VIEWS.map(([mode])=>[mode,graphViewProgress(diagnostic.nodes,attempts,mode,preferences)]));
   const profile=graphProfile(views.combined);
   const rows=eligible.map(concept=>{
@@ -30,5 +31,5 @@ export function reportData({concepts,relationships,questions,attempts,course='BC
     partial:rows.filter(r=>r.status==='partial').sort((a,b)=>b.attempted-a.attempted||byScore(a,b)),
     differences:paired.slice().sort((a,b)=>Math.abs(b.emotionDelta)-Math.abs(a.emotionDelta)),
     adjustments:rows.filter(r=>r.delta!==null&&r.delta<0).sort((a,b)=>a.delta-b.delta),
-    map:{concepts:mapConcepts,edges:mapEdges.filter(e=>ids.has(e.source)&&ids.has(e.target)),focus:ids.has(mapFocus)?mapFocus:null,label:mapLabel}};
+    map:{concepts:mapConcepts,edges:mapEdges.filter(e=>relationshipInCourse(course,e)&&ids.has(e.source)&&ids.has(e.target)),focus:ids.has(mapFocus)?mapFocus:null,label:mapLabel}};
 }

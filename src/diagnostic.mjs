@@ -1,5 +1,5 @@
 import {stats} from './core.mjs';
-import {COURSES,courseIncludes} from './course.mjs';
+import {COURSES,courseIncludes,relationshipInCourse} from './course.mjs';
 
 export const PASS_THRESHOLD=.8;
 export const DIAGNOSTIC_LABELS={unseen:'Not checked',partial:'In progress',passed:'Check passed',review:'Review suggested'};
@@ -26,7 +26,7 @@ export function diagnosticState({concepts,relationships,questions,attempts,cours
   }
   const parents=new Map(eligible.map(c=>[c.id,[]])),children=new Map(eligible.map(c=>[c.id,[]]));
   for(const e of relationships){
-    if(e.type!=='prerequisite'||!byId.has(e.source)||!byId.has(e.target))continue;
+    if(e.type!=='prerequisite'||!relationshipInCourse(course,e)||!byId.has(e.source)||!byId.has(e.target))continue;
     parents.get(e.target).push(e.source);children.get(e.source).push(e.target);
   }
   const recent=[...nodes.keys()].filter(id=>nodes.get(id).lastAttempt).sort((a,b)=>chronology(nodes.get(b).lastAttempt,nodes.get(a).lastAttempt));

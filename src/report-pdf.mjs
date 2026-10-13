@@ -1,4 +1,4 @@
-import {courseTitle} from './course.mjs';
+import {courseTitle,conceptOrigin} from './course.mjs';
 import {REPORT_VIEWS,reportScore} from './report-data.mjs';
 import {DIAGNOSTIC_LABELS} from './diagnostic.mjs';
 import {graphLayout,masteryFill,MASTERY_SCALE} from './graph.mjs';
@@ -130,7 +130,8 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
       box(x,top,w,h,masteryFill(d.score,mode==='movement'?MOVEMENT_SCALE:MASTERY_SCALE),border,10,mode==='combined'&&d.change!==null?movementWidth(d.change/100)*scale:1);
       box(x+10*scale,top+10*scale,Math.max(44,n.id.length*6.5+12)*scale,18*scale,units.find(u=>u.id===n.unit).color,C.line,4,.5);text(n.id,x+16*scale,top+12*scale,10*scale);
       if(next){box(x+w-80*scale,top+10*scale,70*scale,18*scale,C.lilac,'#B9A7D0',4,.5);text('Next check',x+w-74*scale,top+12*scale,9*scale);}
-      wrap(n.title,w-26*scale,12.5*scale,bold).forEach((l,i)=>text(l,x+13*scale,top+(40+i*16)*scale,12.5*scale,bold));
+      if(layout.showOrigins)text(conceptOrigin(n),x+13*scale,top+33*scale,9*scale,body,C.muted);
+      wrap(n.title,w-26*scale,12.5*scale,bold).forEach((l,i)=>text(l,x+13*scale,top+(40+(layout.showOrigins?18:0)+i*16)*scale,12.5*scale,bold));
       const reportSpace=d.expression?24:0;
       text(d.label,x+13*scale,top+h-(42+reportSpace)*scale,10*scale);
       text(DIAGNOSTIC_LABELS[s.status],x+13*scale,top+h-(26+reportSpace)*scale,10*scale);

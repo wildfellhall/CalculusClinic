@@ -34,7 +34,7 @@ test('Each of four courses is closed under prerequisite dependencies and contain
   for(const start of COURSES[course].startingIds)assert.ok(ids.has(start));
  }
  assert.equal(courseIncludes('BC',algebra.concepts[0]),false);assert.equal(courseIncludes('ALG1',calculus.concepts[0]),false);
- assert.deepEqual(catalog.concepts.filter(c=>c.curriculum!=='algebra'),calculus.concepts);for(const q of calculusQuestions)assert.ok(catalog.attemptQuestions.some(item=>item.id===q.id));
+ assert.deepEqual(catalog.concepts.filter(c=>c.curriculum!=='algebra').map(({subsets,...c})=>c),calculus.concepts);for(const q of calculusQuestions)assert.ok(catalog.attemptQuestions.some(item=>item.id===q.id));
 });
 test('The TEKS crosswalk covers every content and process expectation with valid course nodes',()=>{
  const groups={ALG1:[7,9,8,3,3,3,3,2,5,6,2,5],ALG2:[7,4,7,8,5,12,9,3]};
@@ -89,7 +89,7 @@ test('Reports and generated course downloads exclude unrelated courses and retai
  // This integration test builds its own artifacts, so npm test also works from a fresh checkout.
  await import('../scripts/build.mjs');
  const attempts=[...set(34,8),...set(78,6)];
- for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127]]){
+ for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127],['CALC_SUBSET',59]]){
   const report=reportData({...catalog,course,attempts});assert.equal(report.rows.length,count);assert.equal(report.profile.total,count);
   const exported=JSON.parse(await readFile(`dist/data/${course.toLowerCase()}/ontology.json`,'utf8'));
   assert.equal(exported.concepts.length,count);assert.equal(exported.questions.length,count*10);assert.equal(exported.metadata.title,COURSES[course].title);

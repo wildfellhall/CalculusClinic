@@ -1,7 +1,7 @@
 import {mkdir,writeFile,cp} from 'node:fs/promises';
 import {concepts,relationships,units,sources,standards,questions,archivedQuestions,BANK_VERSION,COMPATIBLE_BANK_VERSIONS} from '../data/catalog.mjs';
 import {curriculumCoverage,COVERAGE_SCOPE} from '../data/coverage.mjs';
-import {COURSES,courseIncludes} from '../src/course.mjs';
+import {COURSES,courseConcepts,relationshipInCourse} from '../src/course.mjs';
 import {csv,topologicalOrder} from '../src/core.mjs';
 import {graphLayout,drawGraph} from '../src/graph.mjs';
 import {compileMathText} from './math-format.mjs';
@@ -21,16 +21,17 @@ const bundle={metadata,courses:COURSES,units,concepts,relationships,questions,ar
 await writeFile('dist/data/bundle.js','window.CALCULUS_DATA='+JSON.stringify({...bundle,mathText:compileMathText(concepts,questions)}).replaceAll('<','\\u003c')+';\n');
 async function exportCurriculum(path,nodes,items,edges,course=null){
  await mkdir(path,{recursive:true});
+ nodes=nodes.map(c=>({...c,prerequisites:edges.filter(e=>e.type==='prerequisite'&&e.target===c.id).map(e=>e.source)}));
  const ids=new Set(nodes.map(c=>c.id));
  const itemIds=new Set(items.map(q=>q.id));
  const aligned=coverage.filter(s=>s.conceptIds.some(id=>ids.has(id))).map(s=>{const questionIds=s.questionIds.filter(id=>itemIds.has(id));return {...s,conceptIds:s.conceptIds.filter(id=>ids.has(id)),questionIds,questionCount:questionIds.length};});
  const refs=aligned.filter(s=>!s.id.startsWith('AP.'));
- const info={...metadata,...(course?{course,title:COURSES[course].title}:{}),conceptCount:nodes.length,questionCount:items.length};
+ const info={...metadata,...(course?{course,title:COURSES[course].title,...(COURSES[course].kind==='subset'?{scope:COURSES[course].description,kind:'subset',targetId:COURSES[course].targetId}:{})}:{}),conceptCount:nodes.length,questionCount:items.length};
  await writeFile(path+'/ontology.json',JSON.stringify({metadata:info,units:units.filter(u=>nodes.some(c=>c.unit===u.id)),concepts:nodes,relationships:edges,questions:items,sources,standards:refs,coverage:aligned},null,2));
  await writeFile(path+'/archived-questions.json',JSON.stringify({bankVersion:BANK_VERSION,historyPolicy:metadata.historyPolicy,questions:archivedQuestions.filter(q=>ids.has(q.conceptId))},null,2));
  const rows=nodes.map(c=>({...c,unitTitle:units[c.unit].title,dependents:edges.filter(e=>e.type==='prerequisite'&&e.source===c.id).map(e=>e.target),sourceUrl:sources.find(s=>s.id===c.sourceIds.at(-1))?.url??'',questionIds:items.filter(q=>q.conceptId===c.id).map(q=>q.id)}));
- await writeFile(path+'/concepts.csv',csv(rows,['id','title','curriculum','unit','unitTitle','scope','cedTopic','algebraLevel','alignment','standardIds','objective','subskills','rule','prerequisites','dependents','misconception','firstStep','potentialFriction','support','representations','practices','questionIds','sourceIds','sourceUrl']));
- await writeFile(path+'/relationships.csv',csv(edges,['source','target','type','rationale','provenance','requiredFor']));
+ await writeFile(path+'/concepts.csv',csv(rows,['id','title','curriculum','unit','unitTitle','scope','subsets','cedTopic','algebraLevel','alignment','standardIds','objective','subskills','rule','prerequisites','dependents','misconception','firstStep','potentialFriction','support','representations','practices','questionIds','sourceIds','sourceUrl']));
+ await writeFile(path+'/relationships.csv',csv(edges,['source','target','type','rationale','provenance','requiredFor','courses']));
  await writeFile(path+'/questions.csv',csv(items.map(q=>({...q,standardIds:aligned.filter(s=>s.questionIds.includes(q.id)).map(s=>s.id),optionA:q.options[0].text,optionAId:q.options[0].id,optionB:q.options[1].text,optionBId:q.options[1].id,optionC:q.options[2].text,optionCId:q.options[2].id,correctAnswer:q.options.find(o=>o.id===q.correctOptionId).text})),['id','conceptId','version','replaces','standardIds','prompt','optionAId','optionA','optionBId','optionB','optionCId','optionC','correctOptionId','correctAnswer','explanation','format','authorship','validation']));
  await writeFile(path+'/concept-map.svg',drawGraph(graphLayout(nodes,edges),units,{standalone:true,title:`${course?COURSES[course].title:'Calculus Clinic'} · Concept dependencies`}));
  const courseCoverage=course?.startsWith('ALG')?aligned.filter(s=>s.course===course):aligned;
@@ -39,8 +40,8 @@ async function exportCurriculum(path,nodes,items,edges,course=null){
 }
 await exportCurriculum('dist/data',concepts,questions,relationships);
 for(const course of Object.keys(COURSES)){
- const nodes=concepts.filter(c=>courseIncludes(course,c)),ids=new Set(nodes.map(c=>c.id));
- await exportCurriculum('dist/data/'+course.toLowerCase(),nodes,questions.filter(q=>ids.has(q.conceptId)),relationships.filter(e=>ids.has(e.source)&&ids.has(e.target)),course);
+ const nodes=courseConcepts(course,concepts,relationships),ids=new Set(nodes.map(c=>c.id));
+ await exportCurriculum('dist/data/'+course.toLowerCase(),nodes,questions.filter(q=>ids.has(q.conceptId)),relationships.filter(e=>relationshipInCourse(course,e)&&ids.has(e.source)&&ids.has(e.target)),course);
 }
 for(const file of ['app.mjs','onboarding.mjs','onboarding-ui.mjs','progress-checks.mjs','progress-check-ui.mjs','core.mjs','course.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
 for(const file of ['index.html','styles.css'])await cp('src/'+file,'dist/'+file);
@@ -62,4 +63,4 @@ await cp('node_modules/pdf-lib/dist/pdf-lib.min.js','dist/vendor/pdf/pdf-lib.min
 await cp('node_modules/pdf-lib/LICENSE.md','dist/vendor/pdf/pdf-lib-LICENSE.md');
 await cp('node_modules/@pdf-lib/fontkit/dist/fontkit.umd.min.js','dist/vendor/pdf/fontkit.umd.min.js');
 await cp('node_modules/@pdf-lib/fontkit/README.md','dist/vendor/pdf/fontkit-NOTICE.md');
-console.log(`Built ${concepts.length} concepts, ${relationships.length} typed relationships, ${questions.length} questions. Four courses; 111 AP BC topics and 97 Algebra TEKS content expectations mapped.`);
+console.log(`Built ${concepts.length} concepts, ${relationships.length} typed relationships, ${questions.length} questions. ${Object.keys(COURSES).length} learning paths; 111 AP BC topics and 97 Algebra TEKS content expectations mapped.`);

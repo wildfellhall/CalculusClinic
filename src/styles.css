@@ -237,6 +237,13 @@ button,select,input[type=search]{box-shadow:none}
 .course-option-ab{background:#fff5da;border-color:#d9cba1}
 .course-option-ab:hover{background:#faf0d1;border-color:#bca970}
 .course-option-ab .course-monogram,.course-option-ab .course-begin{border-color:#d9cba1}
+.course-option-subset{grid-column:1/-1;display:grid;grid-template-columns:70px minmax(0,1fr);column-gap:22px;outline:1px dashed #a4cdb4;outline-offset:-7px}
+.course-option-subset .course-monogram{grid-column:1;grid-row:1/5;align-self:center;margin:0;font-size:29px}
+.course-option-subset>span:not(.course-monogram){grid-column:2}
+.course-option-subset .course-description{margin-bottom:12px}
+.course-option-subset .course-begin{margin-top:15px;padding-top:12px}
+.subset-intro{color:var(--muted);max-width:640px;margin-top:16px}
+@media(max-width:520px){.course-option-subset{grid-template-columns:minmax(0,1fr)}.course-option-subset .course-monogram{grid-row:auto;margin-bottom:16px}.course-option-subset>span:not(.course-monogram){grid-column:1}}
 .topic-number{padding:0 8px;white-space:nowrap}
 .standard-list{padding-left:20px}.standard-list li{padding:5px 0}.standard-list a{color:var(--green)}
 
