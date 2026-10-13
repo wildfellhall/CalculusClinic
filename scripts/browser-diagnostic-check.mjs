@@ -3,7 +3,7 @@
 import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
-import {enterCourse} from './browser-course-setup.mjs';
+import {enterCourse,skipProgressCheck} from './browser-course-setup.mjs';
 import {questions,BANK_VERSION} from '../data/catalog.mjs';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 import {masteryFill} from '../src/graph.mjs';
@@ -33,7 +33,7 @@ const answer=async(correct=true)=>{
   const optionId=await run('document.querySelector(".answer-options input").value');
   const q=questions.find(q=>q.options.some(o=>o.id===optionId));assert.ok(q);
   const choice=correct?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id;
-  await click(`input[value="${choice}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');
+  await click(`input[value="${choice}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');await skipProgressCheck(run);
 };
 try{
   await send('Runtime.enable');

@@ -3,7 +3,7 @@
 import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
-import {enterCourse} from './browser-course-setup.mjs';
+import {enterCourse,skipProgressCheck} from './browser-course-setup.mjs';
 import {questions,BANK_VERSION} from '../data/catalog.mjs';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 import {masteryFill} from '../src/graph.mjs';
@@ -118,6 +118,7 @@ try{
     const q=questions.find(q=>(q.replaces??q.id)===`1.11-Q${n}`);await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');
     if(n===2){await click('[data-action="view"][data-view="graph"]');await assertMastery('1.11',.1);await click('[data-action="view"][data-view="practice"]');}
   }
+  await skipProgressCheck(run);
   assert.equal(await run('document.querySelector(".result-number").textContent.trim()'),'9 / 10');
   assert.equal(await run('document.querySelectorAll(".review-list details").length'),10);
   await shot('ten-question-completion');
@@ -207,7 +208,7 @@ try{
   await click('[data-action="view"][data-view="graph"]');await assertMastery('1.11',null);
   console.log('PASS confirmed deletion, unrelated-data preservation, cross-tab reset and reload');
 
-  const legacyBackup={...backup,bankVersion:'1.0.0',attempts:backup.attempts.filter(a=>a.bankVersion==='1.0.0')};
+  const legacyBackup={...backup,progressChecks:undefined,bankVersion:'1.0.0',attempts:backup.attempts.filter(a=>a.bankVersion==='1.0.0')};
   // Four unrevised questions in this set still have the original bank version.
   // Retired wording and mixed-version migration are tested in browser-revisions-check.
   assert.equal(legacyBackup.attempts.length,4);

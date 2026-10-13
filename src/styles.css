@@ -239,3 +239,48 @@ button,select,input[type=search]{box-shadow:none}
 .course-option-ab .course-monogram,.course-option-ab .course-begin{border-color:#d9cba1}
 .topic-number{padding:0 8px;white-space:nowrap}
 .standard-list{padding-left:20px}.standard-list li{padding:5px 0}.standard-list a{color:var(--green)}
+
+/* End-of-set reflection: the same stitched paper border as practice cards. */
+.progress-check{position:relative;max-width:760px;margin:0 auto;border:1px solid #aecfb9;border-radius:20px;background:var(--paper);padding:32px}
+.progress-check::after{content:"";position:absolute;inset:7px;border:1px dashed #c5dccb;border-radius:13px;pointer-events:none}
+.progress-check header{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #d4e6da}
+.progress-check header .eyebrow{display:inline-block;background:var(--mint);border:1px solid #b5d7c2;border-radius:8px;padding:5px 9px;margin-bottom:12px}
+.progress-check h1{font-size:34px;line-height:1.25;margin-bottom:8px;outline:none}
+.progress-check header p{color:var(--muted);font-size:16px}
+.reflection-field{border:0;min-width:0;padding:0;margin:0 0 25px}
+.reflection-field legend{font-size:16px;font-weight:800;padding:0;margin-bottom:12px}
+.reflection-scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.reflection-scale label,.reflection-feelings label{position:relative;cursor:pointer;min-width:0}
+.reflection-scale input,.reflection-feelings input{position:absolute;width:1px;height:1px;opacity:0}
+.reflection-scale label>span{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;min-height:84px;border:1px solid #ceddcb;border-radius:12px;padding:10px 6px;background:#f8faf2;text-align:center;font-size:12px;line-height:1.35}
+.reflection-scale strong{font-family:Fraunces,serif;font-size:23px;font-weight:500;color:var(--green)}
+.reflection-scale input:checked+span{background:var(--mint);border-color:#659779}
+.reflection-scale input:focus-visible+span,.reflection-feelings input:focus-visible+span{outline:3px solid #548e72;outline-offset:3px}
+.reflection-scale label:hover>span{border-color:#659779}
+.reflection-field>.small{margin:-5px 0 12px}
+.reflection-feelings{display:flex;flex-wrap:wrap;gap:8px}
+.reflection-feelings label>span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:8px 14px;border:1px solid #d4cce0;border-radius:11px;background:#f8f5fc;font-size:14px}
+.reflection-feelings input:checked+span{background:var(--lilac);border-color:#92809e}
+.reflection-feelings label:hover>span{border-color:#92809e}
+.reflection-note{margin:0 0 24px;font-size:14px}
+.reflection-note summary{cursor:pointer;min-height:32px}
+.reflection-note label{display:block;margin:12px 0 8px}
+.reflection-note textarea{display:block;width:100%;resize:vertical;min-height:90px;max-height:280px;border:1px solid #bfd5c5;border-radius:10px;padding:12px;background:var(--paper);font:inherit;color:var(--ink)}
+.reflection-error{padding:12px;border:1px solid #d8bda4;border-radius:10px;background:#fff1e4;margin-bottom:16px}
+.progress-check .button-row{align-items:center;gap:20px}
+.progress-check .button-row .text-link{min-height:44px}
+.progress-check-history{border:1px solid var(--line);border-radius:16px;background:var(--paper);padding:20px;margin:24px 0}
+.progress-check-history>summary{cursor:pointer;font-size:17px;font-weight:700}
+.progress-check-history>summary>span{font-size:13px;font-weight:400;color:var(--muted);margin-left:12px}
+.reflection-history-list{margin:16px 0}
+.reflection-history-list>details{padding:15px 0;border-top:1px dashed var(--line)}
+.reflection-history-list>details>summary{display:flex;flex-wrap:wrap;gap:8px 14px;cursor:pointer;font-size:14px}
+.reflection-history-list time,.reflection-status{font-size:12px;color:var(--muted)}
+.reflection-history-list time{margin-left:auto}
+.reflection-response{display:flex;flex-wrap:wrap;gap:12px 28px;margin:18px 0;text-align:left;font-size:14px}
+.reflection-response dt{color:var(--muted);font-size:12px;margin-bottom:3px}
+.reflection-response dd{margin:0}
+.reflection-saved-note{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;text-align:left;padding:12px;border-radius:10px;background:#f8f5fc;margin:12px 0}
+.completed-reflection{margin:20px 0;text-align:left;border:1px dashed #c5dccb;border-radius:12px;padding:15px}
+.completed-reflection>summary{cursor:pointer;font-size:14px;color:var(--green)}
+@media(max-width:520px){.progress-check{padding:25px 18px}.progress-check header{margin-bottom:22px;padding-bottom:16px}.progress-check h1{font-size:29px}.progress-check header p{font-size:14px}.reflection-field legend{font-size:15px}.reflection-scale{gap:5px}.reflection-scale label>span{padding:9px 3px;font-size:11px;min-height:86px}.reflection-scale strong{font-size:21px}.reflection-feelings{gap:7px}.reflection-feelings label>span{font-size:13px;padding:8px 11px}.progress-check .button-row{gap:10px 18px}.progress-check .button.primary{font-size:14px}.progress-check-history{padding:16px}.progress-check-history>summary>span{display:block;margin:6px 0 0}.reflection-history-list time{margin-left:0}.reflection-response{gap:12px 18px}}

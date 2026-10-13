@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {questions} from '../data/catalog.mjs';
+import {skipProgressCheck} from './browser-course-setup.mjs';
 import {PDFDocument} from 'pdf-lib';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
@@ -33,7 +34,7 @@ try{
  await click('[data-action="diagnostic"]');for(let i=0;i<3;i++)await answerNext(true);
  assert.equal((await stored()).length,3);await load();assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'continue');await click('[data-action="diagnostic"]');
  assert.match(await run('document.querySelector(".question-meta").textContent'),/OF 7/);for(let i=3;i<10;i++)await answerNext(i<8);
- await waitFor('!!document.querySelector(".practice-complete")');const history=await stored();assert.equal(history.length,10);assert.equal(history.filter(a=>a.correct).length,8);assert.ok(history.every(a=>Number.isFinite(a.durationMs)&&a.durationMs>0));assert.notEqual(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');
+ await skipProgressCheck(run);await waitFor('!!document.querySelector(".practice-complete")');const history=await stored();assert.equal(history.length,10);assert.equal(history.filter(a=>a.correct).length,8);assert.ok(history.every(a=>Number.isFinite(a.durationMs)&&a.durationMs>0));assert.notEqual(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');
  await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),65);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
  await change('#graph-mode','combined');assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});await change('#graph-mode','movement');assert.deepEqual(await node('MATH_034'),{score:'unscored',status:'passed'});await change('#graph-mode','accuracy');
  await change('#graph-scope','focus');await snap('algebra-diagnostic-graph');

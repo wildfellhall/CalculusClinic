@@ -2,7 +2,7 @@
 // Start headless Chrome with --remote-debugging-port=9224, then run this script.
 import {writeFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import {enterCourse} from './browser-course-setup.mjs';
+import {enterCourse,skipProgressCheck} from './browser-course-setup.mjs';
 import {questions,BANK_VERSION} from '../data/catalog.mjs';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
@@ -36,7 +36,7 @@ const answer=async id=>{
   const q=questions.find(q=>(q.replaces??q.id)===id);
   await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');
   await waitFor('!!document.querySelector(".answer-feedback")');
-  await click('[data-action="next"]');
+  await click('[data-action="next"]');await skipProgressCheck(run);
 };
 const noPageOverflow=async()=>assert.ok(await run('document.documentElement.scrollWidth<=innerWidth+1'),'No horizontal page overflow');
 
