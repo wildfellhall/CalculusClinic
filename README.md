@@ -91,7 +91,7 @@ Camera observations have two distinct components: measurements of facial movemen
 
 MediaPipe Face Landmarker supplies 17 selected facial blendshape coefficients, including inner and outer eyebrow raises, eyebrow lowering, eyelid closure and widening, jaw opening, lip compression, mouth-corner movement, and lip rounding.
 
-After camera permission, calibration automatically collects a short resting-face sample—about six seconds, requiring at least 30 usable samples over at least five seconds. Each coefficient’s median becomes its reference value. A noise allowance accounts for ordinary variation during calibration.
+After camera permission, calibration automatically collects a short resting-face sample—about six seconds, requiring at least 30 usable samples over at least five seconds. Brief detection gaps and slower processing preserve progress; unstable samples are replaced as the resting expression settles. If no steady reference is found within 45 seconds of active sampling, calibration stops and offers a manual retry. Each coefficient’s median becomes its reference value. A noise allowance accounts for ordinary variation during calibration.
 
 For each later sample, the change score averages the absolute departures from those reference values after subtracting the noise allowance, expressed on a 0–100 scale. Signed changes are retained for individual movements, so raising and lowering a feature remain distinguishable. The graph’s purple border reflects the concept’s average movement change.
 
@@ -127,7 +127,7 @@ After a ten-question set, a separate progress survey asks about perceived ease, 
 
 Onboarding introduces the selected path, explains the practice workflow, and requests camera permission before calibration. Camera use can be skipped or disabled in Settings. Question observations are collected during active, unanswered practice; calibration itself does not count as question evidence.
 
-Camera processing stays on the device. Saved observations contain numeric summaries, probabilities, sample counts, and a reference identifier. Images, video, audio, and the resting-face reference itself are not saved. Learners can delete their stored practice data in Settings.
+Camera processing stays on the device. Saved observations contain numeric summaries, probabilities, sample counts, and a reference identifier. The resting-face reference stays in memory for the current visit and is reused after navigating away from practice or switching tabs. Reloading, leaving the page, or revoking access clears it. Images, video, audio, and the resting-face reference itself are not saved. Learners can delete their stored practice data in Settings.
 
 Scores are derived from saved evidence rather than maintained as independent totals. Shared concepts keep their practice history across courses, and narrowing a subset preserves earlier records. Ten-question checks sample a concept’s skills; they are not a validated measure of complete mastery.
 

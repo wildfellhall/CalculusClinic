@@ -26,15 +26,18 @@ try{
  // Use Chrome's fake video stream and deterministic coefficient fixtures.
  // Production has no QA hook; the real worker is tested in browser-observations-check.
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`
-  window.qaDocument=crypto.randomUUID();window.qaMediaCalls=0;window.qaStreams=[];window.qaWorkers=[];window.qaMode='no-face';
+  window.qaDocument=crypto.randomUUID();window.qaMediaCalls=0;window.qaStreams=[];window.qaWorkers=[];window.qaMode='no-face';window.qaFrameStep=0;window.qaDropEvery=0;window.qaFrames=[];
   window.qaNativeMedia=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   navigator.mediaDevices.getUserMedia=async options=>{qaMediaCalls++;const stream=await qaNativeMedia(options);qaStreams.push(stream);return stream;};
   window.Worker=class {
    constructor(){this.ended=false;qaWorkers.push(this);}
    postMessage(data){
     if(data.type==='init'){setTimeout(()=>{if(!this.ended)this.onmessage?.({data:{type:'ready'}})},10);return;}
-    data.frame.close();const values=qaMode==='face'?Object.fromEntries(${JSON.stringify(METRICS.map(m=>m.id))}.map(id=>[id,.2])):null;
-    setTimeout(()=>{if(!this.ended)this.onmessage?.({data:{type:'sample',token:data.token,at:data.at,values,expressions:{neutral:1,happy:0,sad:0,angry:0,fearful:0,disgusted:0,surprised:0},reason:qaMode==='multiple'?'multiple-faces':'no-face'}})},5);
+    data.frame.close();qaFrames.push({includeExpressions:data.includeExpressions});const dropped=qaDropEvery&&qaFrames.length%qaDropEvery===0;
+    const values=qaMode==='face'&&!dropped?Object.fromEntries(${JSON.stringify(METRICS.map(m=>m.id))}.map(id=>[id,.2])):null;
+    // Advance only the fixture's frame timestamps to test the retry deadline.
+    const at=qaFrameStep?(window.qaVirtualAt=Math.max(window.qaVirtualAt||0,data.at)+qaFrameStep):data.at;
+    setTimeout(()=>{if(!this.ended)this.onmessage?.({data:{type:'sample',token:data.token,at,values,expressions:data.includeExpressions?{neutral:1,happy:0,sad:0,angry:0,fearful:0,disgusted:0,surprised:0}:null,reason:qaMode==='multiple'?'multiple-faces':'no-face'}})},5);
    }
    terminate(){this.ended=true;}
   };`});
@@ -55,9 +58,24 @@ try{
  await run('qaMode="multiple"');await waitFor('document.querySelector("#onboarding-camera-message").textContent.includes("More than one face")');assert.equal(await run('document.querySelector("#onboarding-finish").disabled'),true);
  await run('qaMode="face"');await waitFor('document.querySelector("#onboarding-calibration-progress").value>0');await snap('onboarding-calibrating');
  assert.deepEqual(await stored(),[]);assert.equal((await setup()).step,'camera');
+ const partial=await run('document.querySelector("#onboarding-calibration-progress").value');
+ await click('[data-action="onboarding-back"]');assert.equal(await run('qaStreams.every(s=>s.getTracks().every(t=>t.readyState==="ended"))'),true);
+ await click('[data-action="onboarding-camera"]');await waitFor(`document.querySelector('#onboarding-camera-state').textContent==='Calibrating your resting face…'&&document.querySelector('#onboarding-calibration-progress').value>=${partial}`);
  // Reload must resume the camera step and collect a new resting reference.
  await load();assert.equal(await run('!!document.querySelector(".onboarding-camera")'),true);assert.equal(await run('document.querySelector("#onboarding-finish").disabled'),true);
- await run('qaMode="face"');await waitFor('document.querySelector("#onboarding-finish").disabled===false');
+ await run('qaFrameStep=3000');await waitFor('!document.querySelector("#onboarding-recalibrate").hidden');
+ assert.match(await run('document.querySelector("#onboarding-camera-message").textContent'),/Try calibration again/);
+ assert.equal(await run('document.querySelector("#onboarding-recalibrate").textContent'),'Try calibration again');
+ assert.equal(await run('document.querySelector("#onboarding-finish").disabled'),true);await snap('onboarding-calibration-retry');
+ await run('qaFrameStep=0;qaMode="face";qaDropEvery=4');await click('#onboarding-recalibrate');
+ let previousProgress=0;
+ for(let i=0;i<150;i++){
+  const {progress,ready}=await run('({progress:document.querySelector("#onboarding-calibration-progress").value,ready:!document.querySelector("#onboarding-finish").disabled})');
+  assert.ok(progress>=previousProgress,'Intermittent face loss must not reset calibration progress');previousProgress=progress;
+  if(ready)break;await new Promise(r=>setTimeout(r,100));
+ }
+ assert.equal(await run('document.querySelector("#onboarding-finish").disabled'),false);await run('qaDropEvery=0');
+ assert.equal(await run('qaFrames.some(f=>f.includeExpressions)'),false,'Onboarding calibration skips expression inference');
  assert.equal(await run('document.querySelector("#onboarding-camera-state").textContent'),'Calibration complete');await snap('onboarding-calibrated');
  assert.deepEqual(await stored(),[]);assert.deepEqual(Object.keys(await setup()).sort(),['step','version']);
  await click('#onboarding-finish');assert.equal(await run('!!document.querySelector(".explore-home")'),true);assert.equal((await setup()).cameraOutcome,'calibrated');
@@ -67,8 +85,21 @@ try{
  await waitFor('document.querySelector("#camera-state").textContent==="Camera on"');assert.ok(Date.now()-started<4000,'First practice reuses onboarding calibration instead of collecting another six-second reference');
  await new Promise(r=>setTimeout(r,1000));await click('.answer-options input');await click('[data-action="submit"]');
  assert.equal((await stored()).length,1);assert.ok((await stored())[0].facialMovement);assert.ok((await stored())[0].durationMs<5000);
+ const baselineId=(await stored())[0].facialMovement.baselineId;
+ await click('[data-action="next"]');await click('[data-view="graph"]');
+ assert.equal(await run('qaStreams.every(s=>s.getTracks().every(t=>t.readyState==="ended"))'),true);
+ const returned=Date.now();await click('[data-view="practice"]');await waitFor('document.querySelector("#camera-state").textContent==="Camera on"');
+ assert.ok(Date.now()-returned<4000,'Returning from the graph reuses the completed reference');
+ // Dispatch the same visibility events used by a hidden tab, in this isolated page.
+ await run('Object.defineProperty(document,"hidden",{configurable:true,get:()=>window.qaHidden});window.qaHidden=true;document.dispatchEvent(new Event("visibilitychange"))');
+ assert.equal(await run('qaStreams.every(s=>s.getTracks().every(t=>t.readyState==="ended"))'),true);
+ await run('window.qaHidden=false;document.dispatchEvent(new Event("visibilitychange"))');await waitFor('document.querySelector("#camera-state").textContent==="Camera on"');
+ await run('delete document.hidden');await new Promise(r=>setTimeout(r,1000));await click('.answer-options input');await click('[data-action="submit"]');
+ assert.equal((await stored())[1].facialMovement.baselineId,baselineId,'Navigation and tab switches keep the same resting reference');
+ assert.ok((await stored())[1].facialExpression,'Expression inference runs again during practice');
+ assert.equal(await run('Object.values(localStorage).some(value=>value.includes("\\\"center\\\"")||value.includes("\\\"noise\\\""))'),false,'The reference never enters stored data');
  await click('[data-view="settings"]');await click('#camera-revoke');await load();assert.equal(await run('!!document.querySelector(".explore-home")'),true);assert.equal(await run('qaMediaCalls'),0);
- console.log('PASS course → tutorial → camera, keyboard choice, permission timing, no/multiple-face gating, interrupted setup resume, real calibration window, private reference handoff, and stopped camera outside practice');
+ console.log('PASS course → tutorial → camera, permission timing, missing-face gaps, partial resume, bounded retry, private reference reuse across navigation/tab changes, expression inference after calibration, and stopped camera outside practice');
 
  // Denial and missing hardware leave clear recovery controls and an explicit opt-out.
  await run('localStorage.clear()');await size(320);await load();await click('[data-course="BC"]');

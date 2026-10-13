@@ -38,11 +38,11 @@ try{
 let readFailed=!!state.storageMessage;
 let dataRevision=0;
 let reportBusy=false;
-let autoCameraSession=null,onboardingBaseline=null,pageActive=true;
+let autoCameraSession=null,pageActive=true;
 const questionClock=new QuestionClock();
 const camera=new MovementCamera(()=>{syncQuestionClock();updateCameraUI();});
 const cameraAccess=new CameraAccess({storage:browserStorage,mediaDevices:navigator.mediaDevices,permissions:navigator.permissions,secure:isSecureContext,
-  onRevoke:()=>{onboardingBaseline=null;camera.stop();},onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
+  onRevoke:()=>camera.stop(),onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
 function updateQuestionTimer(){
   const el=document.querySelector('#question-timer'),label=document.querySelector('#timer-status');
   if(!el||!state.quiz)return;
@@ -61,8 +61,7 @@ function syncQuestionClock(focused=document.hasFocus()){
     // Try once per visible practice session. Model/device failures need an
     // explicit retry, rather than a loop of permission or camera requests.
     autoCameraSession=quiz.sessionId;
-    const baseline=onboardingBaseline;onboardingBaseline=null;
-    void camera.start({baseline}).then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again in Settings.');});
+    void camera.start().then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again in Settings.');});
   }
   const z=state.quiz,q=z?.list[z.index];
   if(!q)questionClock.reset();
@@ -119,12 +118,12 @@ function updateOnboardingCameraUI(){
   document.querySelector('#onboarding-calibration-label').hidden=progress.hidden;
   const enable=document.querySelector('#onboarding-camera-enable');enable.hidden=on;enable.disabled=cameraAccess.pending;
   enable.textContent=cameraAccess.pending?'Waiting for permission…':camera.message||cameraAccess.message?'Try camera again':'Enable camera';
-  document.querySelector('#onboarding-recalibrate').hidden=!ready;
+  const recalibrate=document.querySelector('#onboarding-recalibrate');recalibrate.hidden=!ready&&camera.stage!=='uncalibrated';
+  recalibrate.textContent=ready?'Recalibrate resting face':'Try calibration again';
   document.querySelector('#onboarding-finish').disabled=!ready||!cameraAccess.canStart;
 }
 function finishOnboarding(skipCamera){
   if(state.onboarding!=='camera'||(!skipCamera&&(camera.stage!=='ready'||!camera.baseline||!cameraAccess.canStart)))return;
-  onboardingBaseline=skipCamera?null:structuredClone(camera.baseline);
   state.onboarding=null;state.view='atlas';state.tab='browse';state.unit='all';state.query='';
   const saved=saveOnboardingStep('complete',skipCamera?'skipped':'calibrated');
   if(skipCamera)cameraAccess.revoke();
@@ -396,7 +395,7 @@ function renderSettings(){
     <section class="settings-section camera-settings"><div class="camera-heading"><h2>Camera use</h2><span id="camera-access-state" class="camera-state">${cameraAccess.enabled?'On during practice':'Off'}</span></div><p>Starts automatically during practice after permission is granted. Resting-face calibration begins automatically and takes about six seconds.</p><div class="button-row"><button class="button" id="camera-settings-enable" data-action="camera-enable" ${cameraAccess.enabled?'hidden':''}>Enable camera</button><button class="button" id="camera-revoke" data-action="camera-revoke" ${cameraAccess.enabled?'':'hidden'}>Revoke camera access</button></div><p id="camera-access-message" class="small muted" role="status" hidden></p><details class="score-method"><summary>Browser permission</summary><p>Revoking access here stops capture immediately and keeps camera use off in this app. To remove the browser’s stored permission too, open the camera or site-controls icon beside the address bar and reset this site’s camera permission.</p></details></section>
     <section class="settings-section scoring-settings" aria-labelledby="scoring-title"><h2 id="scoring-title">Score preferences</h2><label class="scoring-toggle"><input type="checkbox" id="include-self-reports" ${state.scoringPreferences.includeSelfReports?'checked':''} aria-describedby="self-report-setting-help"><span>Include self-reported check-ins</span></label><p id="self-report-setting-help" class="small muted">Unpleasant check-ins can reduce the combined score by up to ${SCORE_POLICY.selfReportWeight*100}% of answer credit. Accuracy and the camera-only view stay separate.</p><details class="score-method"><summary>How contributions are counted</summary><p>${combinedExplanation(state.scoringPreferences)}</p></details></section>
     <section class="settings-section"><h2>Saved practice</h2><p><strong>${state.attempts.length} ${state.attempts.length===1?'attempt':'attempts'}</strong> stored in this session. Progress is saved in this browser; it does not sync across devices.</p><div class="button-row"><button class="button" data-action="backup">Export backup</button><label class="button file-button">Import backup<input id="import-file" type="file" accept="application/json,.json"></label></div><p class="muted small">Backups include progress checks, saved check-ins, camera summaries and score preferences. Import merges attempts and restores any included score preference.</p>${archivedAttempts?`<p class="small muted" id="archived-attempt-note">${archivedAttempts} earlier ${archivedAttempts===1?'answer is':'answers are'} preserved for replaced questions. Revised problems need fresh answers for accuracy and diagnostic passing. Your earlier camera observations remain part of each concept’s history.</p>`:''}</section>
-    <details class="settings-section"><summary>Check-ins & camera data</summary><p>Camera permission is requested on your first visit. Once allowed, camera use starts automatically in practice. You can revoke access above. Measurements run locally. Images, video, audio and the resting reference are never stored or uploaded. Only numeric summaries and voluntary emotion check-ins are saved with answers.</p><p>The camera stops when you leave practice or hide this tab. Each new camera session calibrates your resting face automatically. The question timer pauses during calibration; you can recalibrate at any time. Camera preferences belong to this browser and are not restored from practice backups. Check-ins work without a camera. Graph views can show an experimental camera-adjusted score, with facial movement as a separate border. Raw answer accuracy, passing and diagnostic recommendations do not change. Check-ins contribute to the combined view only when enabled above.</p>${observationMethod(state.scoringPreferences)}</details>
+    <details class="settings-section"><summary>Check-ins & camera data</summary><p>Camera permission is requested on your first visit. Once allowed, camera use starts automatically in practice. You can revoke access above. Measurements run locally. Images, video, audio and the resting reference are never stored or uploaded. Only numeric summaries and voluntary emotion check-ins are saved with answers.</p><p>The camera stops when you leave practice or hide this tab. Your resting-face calibration is kept in memory during this visit and reused when you return to practice. Brief interruptions pause calibration progress. Reloading the page or revoking camera access clears the reference. The question timer pauses during calibration; you can recalibrate at any time. Camera preferences belong to this browser and are not restored from practice backups. Check-ins work without a camera. Graph views can show an experimental camera-adjusted score, with facial movement as a separate border. Raw answer accuracy, passing and diagnostic recommendations do not change. Check-ins contribute to the combined view only when enabled above.</p>${observationMethod(state.scoringPreferences)}</details>
     <details class="settings-section"><summary>Progress & observation exports</summary><div class="download-list">${reportButton()}<button data-action="export-progress">Selected course · accuracy, mastery & observations <span>CSV ↓</span></button><button data-action="export-question-progress">Selected course · question accuracy <span>CSV ↓</span></button><button data-action="export-attempts">Every attempt <span>CSV ↓</span></button><button data-action="export-progress-checks">Selected course · progress checks <span>CSV ↓</span></button></div></details>
     <details class="settings-section"><summary>Curriculum downloads</summary><div class="download-list">${[['concepts.csv','Concepts','CSV'],['relationships.csv','Relationships','CSV'],['questions.csv','Questions & answers','CSV'],['ontology.json','Complete ontology','JSON'],['concept-map.svg','Complete concept graph','SVG'],['coverage.csv',COURSES[state.course].kind==='subset'?'AP & TEKS references':state.course.startsWith('ALG')?'TEKS crosswalk & question evidence':'AP topic & question coverage','CSV'],['question-audit.csv','Question review by concept','CSV'],['archived-questions.json','Earlier question versions','JSON']].map(([file,label,type])=>`<a download href="/data/${state.course.toLowerCase()}/${file}">${label}<span>${type} ↓</span></a>`).join('')}</div></details>
     <details class="settings-section"><summary>Getting started</summary><button class="button compact setup-replay" data-action="review-setup">Review the tour & camera setup</button></details>
@@ -451,7 +450,7 @@ document.addEventListener('click',e=>{
   if(action==='onboarding-enable-camera'){void enableOnboardingCamera();return;}
   if(action==='onboarding-finish'){finishOnboarding(false);return;}
   if(action==='onboarding-skip-camera'){finishOnboarding(true);return;}
-  if(action==='review-setup'){state.quiz=null;state.progressCheckId=null;onboardingBaseline=null;setOnboardingStep('tutorial');return;}
+  if(action==='review-setup'){state.quiz=null;state.progressCheckId=null;camera.stop();setOnboardingStep('tutorial');return;}
   if(action==='select')return selectConcept(id);
   if(action==='export-report'){void exportReport();return;}
   if(action==='graph-mode'){setGraphMode(el.dataset.mode);return;}
@@ -540,7 +539,7 @@ function renderStoredProgress(){
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
 window.addEventListener('blur',()=>{syncQuestionClock(false);updateCameraUI();});
 window.addEventListener('focus',()=>{syncQuestionClock();updateCameraUI();});
-window.addEventListener('pagehide',()=>{pageActive=false;onboardingBaseline=null;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
+window.addEventListener('pagehide',()=>{pageActive=false;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
 window.addEventListener('pageshow',()=>{pageActive=true;syncQuestionClock();});
 setInterval(updateQuestionTimer,250);
 window.addEventListener('storage',e=>{

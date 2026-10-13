@@ -27,7 +27,9 @@ self.onmessage=async ({data})=>{
         if(minX<.02||maxX>.98||minY<.02||maxY>.98||maxX-minX<.15)reason='position';
         else {
           values=movementVector(result.faceBlendshapes[0]?.categories);if(!values)reason='unusable';
-          if(values){
+          // Calibration needs only movement coefficients. Expression inference
+          // is extra CPU work and must not delay collecting the resting sample.
+          if(values&&data.includeExpressions){
             const w=data.frame.width,h=data.frame.height,pad=.1*Math.max((maxX-minX)*w,(maxY-minY)*h);
             const left=Math.max(0,minX*w-pad),top=Math.max(0,minY*h-pad),right=Math.min(w,maxX*w+pad),bottom=Math.min(h,maxY*h+pad);
             context.drawImage(data.frame,left,top,right-left,bottom-top,0,0,112,112);

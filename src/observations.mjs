@@ -14,6 +14,7 @@ export const METRICS=[
 export const EMOTIONS=['happiness','frustration','fear','anger','sadness','calm','neutral','mixed'];
 export const VALENCES={pleasant:1,neutral:0,unpleasant:-1};
 export const CALIBRATION_SAMPLES=30;
+export const CALIBRATION_TIMEOUT_MS=45000;
 const round=x=>Math.round(x*10000)/10000;
 const mean=xs=>xs.reduce((a,b)=>a+b,0)/xs.length;
 const median=xs=>{const sorted=[...xs].sort((a,b)=>a-b),m=Math.floor(xs.length/2);return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2;};
@@ -36,6 +37,27 @@ export function calibrate(samples,id){
     noise[key]=Math.max(.015,3*mad);
   }
   return {id,center,noise};
+}
+// Keep usable samples through brief detection gaps and slow inference. Explicit
+// pauses exclude time away; a rolling window lets early movement settle without
+// restarting progress. Only a stable reference finishes the calibration.
+export class RestingCalibration {
+  constructor(){this.frames=[];this.elapsed=0;this.lastTime=null;this.progress=0;this.expired=false;}
+  pause(){this.lastTime=null;}
+  add(values,at){
+    if(this.expired||!Number.isFinite(at))return null;
+    if(this.lastTime!==null)this.elapsed+=Math.max(0,at-this.lastTime);
+    this.lastTime=at;
+    if(this.elapsed>=CALIBRATION_TIMEOUT_MS){this.expired=true;return null;}
+    if(!validVector(values))return null;
+    this.frames.push({values,at:this.elapsed});
+    if(this.frames.length>CALIBRATION_SAMPLES)this.frames.shift();
+    const span=this.elapsed-this.frames[0].at;
+    this.progress=Math.max(this.progress,Math.min(99,Math.floor(100*Math.min(this.frames.length/CALIBRATION_SAMPLES,span/5000))));
+    if(this.frames.length<CALIBRATION_SAMPLES||span<5000)return null;
+    try{return calibrate(this.frames.map(frame=>frame.values));}
+    catch{return null;}
+  }
 }
 export function frameChange(values,baseline){
   if(!validVector(values))return null;
