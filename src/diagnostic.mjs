@@ -1,4 +1,5 @@
 import {stats} from './core.mjs';
+import {COURSES,courseIncludes} from './course.mjs';
 
 export const PASS_THRESHOLD=.8;
 export const DIAGNOSTIC_LABELS={unseen:'Not checked',partial:'In progress',passed:'Check passed',review:'Review suggested'};
@@ -9,7 +10,7 @@ const chronology=(a,b)=>a.answeredAt.localeCompare(b.answeredAt)||a.id.localeCom
 // prerequisites or dependents. Rebuild from saved history instead of caching a
 // separate recommendation, so imports, deletion and retries stay consistent.
 export function diagnosticState({concepts,relationships,questions,attempts,course='BC',passThreshold=PASS_THRESHOLD}){
-  const eligible=concepts.filter(c=>course!=='AB'||c.scope!=='BC only');
+  const eligible=concepts.filter(c=>courseIncludes(course,c));
   const byId=new Map(eligible.map(c=>[c.id,c])),order=new Map(eligible.map((c,i)=>[c.id,i]));
   const itemIds=new Map(eligible.map(c=>[c.id,[]])),records=new Map(eligible.map(c=>[c.id,[]]));
   const knownQuestions=new Map(questions.filter(q=>byId.has(q.conceptId)).map(q=>[q.id,q]));
@@ -63,7 +64,8 @@ export function diagnosticState({concepts,relationships,questions,attempts,cours
   };
   if(!eligible.some(c=>nodes.get(c.id).available))return result('complete',null,null,'There are no questions available for this course.');
   if(!latestId){
-    const start=byId.has('1.2')&&nodes.get('1.2').available?'1.2':eligible.find(c=>nodes.get(c.id).available).id;
+    const entry=COURSES[course]?.entryId;
+    const start=byId.has(entry)&&nodes.get(entry).available?entry:eligible.find(c=>nodes.get(c.id).available).id;
     return result('start',start,null,'Start with this check to choose a direction through the graph. You can also choose any concept below.');
   }
   const latest=nodes.get(latestId);

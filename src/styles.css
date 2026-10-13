@@ -229,3 +229,13 @@ button,select,input[type=search]{box-shadow:none}
 .saved-observation{font-size:13px;line-height:1.8}
 @media(max-width:520px){.observation-panel>summary,.node-observations>summary{padding:15px;font-size:13px}.observation-panel>summary>span,.node-observations>summary>span{display:block;margin:6px 0 0}.observation-body{padding:0 15px 18px}.checkin-fields{grid-template-columns:1fr}.observation-scores{grid-template-columns:1fr}.camera-heading h2,.emotion-checkin legend{font-size:20px}.camera-controls .button-row{gap:12px}.camera-controls p,.emotion-checkin p{font-size:12px}.camera-preview{max-width:210px}}
 @media print{.camera-controls{display:none}}
+
+/* Algebra extends the same course-card and annotated-paper palette. */
+.course-option-alg2{background:#edf3fb;border-color:#b4c9dc}
+.course-option-alg2:hover{background:#e5eef8;border-color:#8eaec8}
+.course-option-alg2 .course-monogram,.course-option-alg2 .course-begin{border-color:#b4c9dc}
+.course-option-ab{background:#fff5da;border-color:#d9cba1}
+.course-option-ab:hover{background:#faf0d1;border-color:#bca970}
+.course-option-ab .course-monogram,.course-option-ab .course-begin{border-color:#d9cba1}
+.topic-number{padding:0 8px;white-space:nowrap}
+.standard-list{padding-left:20px}.standard-list li{padding:5px 0}.standard-list a{color:var(--green)}

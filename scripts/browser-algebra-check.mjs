@@ -1,0 +1,60 @@
+// Run in an isolated Chrome profile on port 9224 with fake media devices only.
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {questions} from '../data/catalog.mjs';
+import {PDFDocument} from 'pdf-lib';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
+const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
+const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl),pending=new Map(),errors=[];let seq=0;
+await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
+ws.onmessage=({data})=>{const m=JSON.parse(data);if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);clearTimeout(p.timer);m.error?p.reject(new Error(m.error.message)):p.resolve(m.result);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text);};
+const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject,timer:setTimeout(()=>reject(new Error('Timed out: '+method)),25000)});ws.send(JSON.stringify({id,method,params}));});
+const run=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true,replMode:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
+const waitFor=async expression=>{for(let i=0;i<150;i++){if(await run(expression))return;await new Promise(r=>setTimeout(r,100));}throw new Error('Condition not met: '+expression+'\n'+await run('document.body.innerText.slice(-2000)'));};
+const click=s=>run(`document.querySelector(${JSON.stringify(s)}).click()`);
+const change=(s,value)=>run(`(()=>{const e=document.querySelector(${JSON.stringify(s)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+const load=async(method='Page.reload',params={})=>{const before=await run('window.qaDocument??null');await send(method,params);await waitFor(`!!window.qaDocument&&window.qaDocument!==${JSON.stringify(before)}&&document.readyState==='complete'&&!!document.querySelector('.course-onboarding,.explore-home')`);};
+const snap=async name=>{await run('await document.fonts.ready.then(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))');const r=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await writeFile('test-results/'+name+'.png',Buffer.from(r.data,'base64'));};
+const stored=()=>run('JSON.parse(localStorage.getItem("calculus-clinic-progress-v1"))?.attempts||[]');
+const choice=()=>run('JSON.parse(localStorage.getItem("calculus-clinic-course-v1"))?.course');
+const node=id=>run(`(()=>{const e=document.querySelector('.graph-node[data-concept="${id}"]');return {score:e?.dataset.fillScore,status:e?.dataset.status}})()`);
+const answerNext=async correct=>{
+ const option=await run(`(()=>{const input=document.querySelector('input[name=answer]');const q=CALCULUS_DATA.questions.find(q=>q.options.some(o=>o.id===input.value));return ${correct?'q.correctOptionId':'q.options.find(o=>o.id!==q.correctOptionId).id'};})()`);
+ await click(`input[value="${option}"]`);await click('#check-answer');await waitFor('!!document.querySelector(".answer-feedback")');await click('[data-action="next"]');
+};
+try{
+ await mkdir('test-results/pdfs',{recursive:true});await send('Page.enable');await send('Runtime.enable');
+ await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
+ await send('Storage.clearDataForOrigin',{origin:appURL,storageTypes:'local_storage'});
+ await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA camera denied','NotAllowedError')};`});
+ await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),4);await snap('algebra-onboarding');
+ await click('[data-course="ALG1"]');await waitFor('!!document.querySelector(".explore-home")');assert.equal(await choice(),'ALG1');assert.match(await run('document.querySelector("h1").textContent'),/algebra/);await snap('algebra-home');
+ await click('[data-view="practice"]');assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');assert.equal(await run('document.querySelector("#practice-concept").options.length'),65);
+ await click('[data-action="diagnostic"]');for(let i=0;i<3;i++)await answerNext(true);
+ assert.equal((await stored()).length,3);await load();assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'continue');await click('[data-action="diagnostic"]');
+ assert.match(await run('document.querySelector(".question-meta").textContent'),/OF 7/);for(let i=3;i<10;i++)await answerNext(i<8);
+ await waitFor('!!document.querySelector(".practice-complete")');const history=await stored();assert.equal(history.length,10);assert.equal(history.filter(a=>a.correct).length,8);assert.ok(history.every(a=>Number.isFinite(a.durationMs)&&a.durationMs>0));assert.notEqual(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');
+ await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),65);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
+ await change('#graph-mode','combined');assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});await change('#graph-mode','movement');assert.deepEqual(await node('MATH_034'),{score:'unscored',status:'passed'});await change('#graph-mode','accuracy');
+ await change('#graph-scope','focus');await snap('algebra-diagnostic-graph');
+ await change('#graph-concept','MATH_061');await click('[data-action="notes"]');assert.match(await run('document.querySelector(".concept-notes").textContent'),/A.8A/);
+ await click('[data-action="practice"][data-id="MATH_061"]');assert.equal(await run('document.querySelectorAll(".question-title .katex").length>0'),true);await snap('algebra-quadratic-question');
+ // Passing a shared check survives switching and reloading, while course-specific data stays filtered.
+ await change('#course','ALG2');await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),86);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
+ await load();assert.equal(await choice(),'ALG2');assert.deepEqual(await stored(),history);
+ const advanced=questions.filter(q=>q.conceptId==='MATH_078').map((q,i)=>({id:'advanced-'+i,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:i<6?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct:i<6,answeredAt:new Date(Date.UTC(2026,9,13,12,i)).toISOString(),sessionId:'algebra-qa',durationMs:50000}));
+ await run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({schemaVersion:1,attempts:${JSON.stringify([...history,...advanced])}}))`);await load();
+ assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'prerequisite');assert.equal(await run('document.querySelector(".next-check").dataset.anchor'),'MATH_078');
+ await click('[data-view="graph"]');await change('#graph-concept','MATH_078');await snap('algebra2-review-graph');
+ await run('window.qaBlobs=[];window.qaNames=[];URL.createObjectURL=b=>{qaBlobs.push(b);return "blob:qa"};HTMLAnchorElement.prototype.click=function(){qaNames.push(this.download)}');
+ await click('[data-action="export-report"]');await waitFor('qaBlobs.length===1');const bytes=await run('await qaBlobs[0].arrayBuffer().then(b=>Array.from(new Uint8Array(b)))');const pdf=await PDFDocument.load(new Uint8Array(bytes));assert.equal(pdf.getTitle(),'Calculus Clinic - Algebra II report');assert.ok(pdf.getPageCount()>7);await writeFile('test-results/pdfs/algebra2-report.pdf',new Uint8Array(bytes));
+ await click('[data-view="settings"]');const links=await run('[...document.querySelectorAll("a[download]")].map(a=>a.getAttribute("href"))');assert.ok(links.every(l=>l.startsWith('/data/alg2/')));for(const link of links)assert.ok((await fetch(appURL+link)).ok,link);
+ await click('[data-action="export-progress"]');await waitFor('qaBlobs.length===2');const csv=await run('await qaBlobs[1].text()');assert.ok(csv.includes('MATH_078'));assert.ok(!csv.includes('Continuity at a point'));
+ await change('#course','ALG1');await click('[data-action="export-progress"]');const csv1=await run('await qaBlobs[2].text()');assert.ok(csv1.includes('MATH_034'));assert.ok(!csv1.includes('MATH_078'));
+ await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),65);assert.equal(await run(`!!document.querySelector('.graph-node[data-concept="MATH_078"]')`),false);
+ await change('#course','AB');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),97);await change('#course','BC');assert.equal(await run('document.querySelectorAll(".graph-node").length'),127);
+ await change('#course','ALG2');await change('#graph-scope','focus');await change('#graph-concept','MATH_078');
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,screenWidth:390,screenHeight:844,deviceScaleFactor:1,mobile:true});await waitFor('innerWidth===390');assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true);await waitFor('!document.querySelector("#toast").classList.contains("show")');await snap('algebra2-mobile-graph');
+ await click('[data-view="settings"]');await click('#delete-data');await click('[data-action="confirm-delete"]');assert.equal((await stored()).length,0);assert.equal(await choice(),'ALG2');await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('[...document.querySelectorAll(".graph-node")].every(n=>n.dataset.fillScore==="unscored")'),true);
+ assert.deepEqual(errors,[]);console.log('PASS Algebra onboarding, 8/10 diagnostic completion, partial resume, prerequisite probing, persistence across courses, graph shading, standards, math, scoped exports, PDF, mobile, and deletion.');
+}finally{ws.close();}

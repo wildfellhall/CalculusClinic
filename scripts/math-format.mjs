@@ -7,7 +7,7 @@ const supers = Object.fromEntries([...('⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽�
 const subs = Object.fromEntries([...('₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜₓᵧ')].map((c,i)=>[c,[...'0123456789+-=()aehijklmnoprstxy'][i]]));
 const labels = new Set(['right','left','top','bottom','outer','inner','upper','lower']);
 const units = new Set(['cm','mm','kg','min','hour','hours','day','days','people','People']);
-const monomials = new Set(['xy','uv','fg','rK','Ce','Ae','Pe','yA','xyy','ky','kx','kt','xe','te','Cx','ab','rh','lw','rV','hF','Le']);
+const monomials = new Set(['ax','bx','cx','ac','ad','bc','bd','Pt','Pr','Prt','rt','xy','uv','fg','rK','Ce','Ae','Pe','yA','xyy','ky','kx','kt','xe','te','Cx','ab','rh','lw','rV','hF','Le']);
 const symbols = {'−':'-','×':'\\times ','·':'\\cdot ','÷':'\\div ','≠':'\\ne ','≤':'\\le ','≥':'\\ge ','→':'\\to ','±':'\\pm ','≈':'\\approx ','∞':'\\infty ','π':'\\pi ','θ':'\\theta ','ε':'\\varepsilon ','Δ':'\\Delta ','Σ':'\\sum ','∑':'\\sum ','∫':'\\int ','∘':'\\circ ','∪':'\\cup ','∈':'\\in ','…':'\\ldots ','′':"'",'″':"''",'‴':"'''"};
 const openers = new Set(['(','[','⟨','{']);
 const closers = new Set([')',']','⟩','}']);

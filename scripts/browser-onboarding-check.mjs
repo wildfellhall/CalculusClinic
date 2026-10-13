@@ -23,7 +23,7 @@ try{
   await send('Storage.clearDataForOrigin',{origin:appURL,storageTypes:'local_storage'});
   await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();window.qaMediaCalls=0;window.qaStreams=[];const nativeMedia=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async options=>{qaMediaCalls++;const stream=await nativeMedia(options);qaStreams.push(stream);return stream;};`});
   await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});
-  assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),2);
+  assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),4);
   assert.equal(await run('qaMediaCalls'),0,'Course choice must appear before the camera request');
   assert.equal(await choice(),undefined);await snap('onboarding-desktop');
   await run('document.querySelector(\'[data-course="AB"]\').focus()');

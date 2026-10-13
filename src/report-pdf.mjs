@@ -1,3 +1,4 @@
+import {courseTitle} from './course.mjs';
 import {REPORT_VIEWS,reportScore} from './report-data.mjs';
 import {DIAGNOSTIC_LABELS} from './diagnostic.mjs';
 import {graphLayout,masteryFill,MASTERY_SCALE} from './graph.mjs';
@@ -14,7 +15,7 @@ const date=value=>new Date(value).toISOString().slice(0,10);
 export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
   const {PDFDocument,rgb}=PDFLib,doc=await PDFDocument.create();doc.registerFontkit(fontkit);
   const [body,bold,display]=await Promise.all(fonts.map(bytes=>doc.embedFont(bytes,{subset:true})));
-  doc.setTitle(`Calculus Clinic - AP Calculus ${report.course} report`);doc.setAuthor('Calculus Clinic');doc.setCreator('Calculus Clinic');doc.setCreationDate(new Date(report.generatedAt));
+  doc.setTitle(`Calculus Clinic - ${courseTitle(report.course)} report`);doc.setAuthor('Calculus Clinic');doc.setCreator('Calculus Clinic');doc.setCreationDate(new Date(report.generatedAt));
   const color=hex=>rgb(...hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255));
   let page,W,H,y;const margin=38,standard=[841.89,595.28];
   const text=(value,x,top,size=11,font=body,ink=C.ink)=>page.drawText(plain(value),{x,y:H-top-size,size,font,color:color(ink)});
@@ -39,7 +40,7 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
     page=doc.addPage(size);[W,H]=size;
     page.drawRectangle({x:0,y:0,width:W,height:H,color:color(C.paper)});
     text('CALCULUS CLINIC',margin,22,9,bold,C.muted);
-    text(`AP ${report.course}  |  ${date(report.generatedAt)}`,W-175,22,9,body,C.muted);
+    text(`${courseTitle(report.course)}  |  ${date(report.generatedAt)}`,W-235,22,9,body,C.muted);
     text(title,margin,46,26,display);y=87;
     if(subtitle){const lines=wrap(subtitle,W-2*margin,10);for(const l of lines){text(l,margin,y,10,body,C.muted);y+=14;}y+=6;}
     line(margin,y,W-margin,y);y+=18;
@@ -61,7 +62,7 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
   const name=r=>`${r.concept.id}  ${r.concept.title}`;
   const number=value=>value===null?'--':reportScore(value);
   const period=report.dateRange?`${date(report.dateRange[0])} to ${date(report.dateRange[1])}`:'No saved answers';
-  addPage('Your calculus report',`Practice snapshot: ${period}  |  ${report.attemptCount} saved attempts, including retries`);
+  addPage(`Your ${courseTitle(report.course)} report`,`Practice snapshot: ${period}  |  ${report.attemptCount} saved attempts, including retries`);
   const cardW=(W-2*margin-28)/3,top=y;
   REPORT_VIEWS.forEach(([mode,label],i)=>{
     const x=margin+i*(cardW+14),r=report.profile.rows[mode];box(x,top,cardW,108,mode==='movement'?C.lilac:C.mint);
@@ -103,7 +104,7 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
   paragraph(cameraScoreExplanation(),{size:10});paragraph(combinedExplanation(report.preferences),{size:10});
   paragraph('Camera labels are experimental expression estimates, not direct measurements of felt emotion or understanding. The model has no frustration class. Repeated camera observations are weighted by usable sample count within a concept; course means give each concept equal weight. Self-report and camera evidence remain separate.',{size:10});
   heading('Graph sheets & concept ledger');
-  paragraph(`The following three sheets show ${report.map.label.toLowerCase()} (${report.map.concepts.length} concepts), using the same scores and connections as the app. Large graph sheets expand to keep type readable when zoomed. They are vector graphics. The final ledger includes all ${report.rows.length} concepts in AP Calculus ${report.course}, including foundations.`,{size:10});
+  paragraph(`The following three sheets show ${report.map.label.toLowerCase()} (${report.map.concepts.length} concepts), using the same scores and connections as the app. Large graph sheets expand to keep type readable when zoomed. They are vector graphics. The final ledger includes all ${report.rows.length} concepts in ${courseTitle(report.course)}, including foundations.`,{size:10});
   paragraph(`Generated ${report.generatedAt}. Scoring policy ${report.policyVersion}. A snapshot of saved local numeric data; no camera images, video or audio are included.`,{size:9,ink:C.muted});
 
   for(const [mode,label] of REPORT_VIEWS){
@@ -127,7 +128,7 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
       const s=progress.get(n.id),d=s.display,x=ox+n.x*scale,top=oy+n.y*scale,w=n.w*scale,h=n.h*scale,next=n.id===report.diagnostic.recommendation.targetId;
       const border=mode==='combined'&&d.change!==null?masteryFill(d.change/100,MOVEMENT_BORDER_SCALE):C.line;
       box(x,top,w,h,masteryFill(d.score,mode==='movement'?MOVEMENT_SCALE:MASTERY_SCALE),border,10,mode==='combined'&&d.change!==null?movementWidth(d.change/100)*scale:1);
-      box(x+10*scale,top+10*scale,44*scale,18*scale,units.find(u=>u.id===n.unit).color,C.line,4,.5);text(n.id,x+16*scale,top+12*scale,10*scale);
+      box(x+10*scale,top+10*scale,Math.max(44,n.id.length*6.5+12)*scale,18*scale,units.find(u=>u.id===n.unit).color,C.line,4,.5);text(n.id,x+16*scale,top+12*scale,10*scale);
       if(next){box(x+w-80*scale,top+10*scale,70*scale,18*scale,C.lilac,'#B9A7D0',4,.5);text('Next check',x+w-74*scale,top+12*scale,9*scale);}
       wrap(n.title,w-26*scale,12.5*scale,bold).forEach((l,i)=>text(l,x+13*scale,top+(40+i*16)*scale,12.5*scale,bold));
       const reportSpace=d.expression?24:0;
