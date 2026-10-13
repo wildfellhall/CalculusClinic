@@ -15,7 +15,7 @@ import {graphViewProgress,graphProfile} from '../src/graph-views.mjs';
 import {graphLayout,drawGraph,masteryFill} from '../src/graph.mjs';
 import {compileMathText,curriculumText,mathSegments} from '../scripts/math-format.mjs';
 const id=n=>`MATH_${String(n).padStart(3,'0')}`;
-const items=n=>algebraQuestions.filter(q=>q.conceptId===id(n));
+const items=n=>catalog.questions.filter(q=>q.conceptId===id(n));
 const answer=(q,i,correct=true)=>({id:`test-${q.id}-${i}`,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:correct?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct,answeredAt:new Date(Date.UTC(2026,9,12,12,i)).toISOString(),sessionId:'algebra-test',durationMs:40000});
 const set=(n,correct=10)=>items(n).map((q,i)=>answer(q,i,i<correct));
 const diagnose=(course,attempts=[])=>diagnosticState({...catalog,course,attempts});
@@ -34,7 +34,7 @@ test('Each of four courses is closed under prerequisite dependencies and contain
   for(const start of COURSES[course].startingIds)assert.ok(ids.has(start));
  }
  assert.equal(courseIncludes('BC',algebra.concepts[0]),false);assert.equal(courseIncludes('ALG1',calculus.concepts[0]),false);
- assert.deepEqual(catalog.concepts.filter(c=>c.curriculum!=='algebra'),calculus.concepts);assert.deepEqual(catalog.questions.filter(q=>!q.conceptId.startsWith('MATH_')),calculusQuestions);
+ assert.deepEqual(catalog.concepts.filter(c=>c.curriculum!=='algebra'),calculus.concepts);for(const q of calculusQuestions)assert.ok(catalog.attemptQuestions.some(item=>item.id===q.id));
 });
 test('The TEKS crosswalk covers every content and process expectation with valid course nodes',()=>{
  const groups={ALG1:[7,9,8,3,3,3,3,2,5,6,2,5],ALG2:[7,4,7,8,5,12,9,3]};
@@ -80,8 +80,8 @@ test('Saved Algebra mastery follows shared nodes across courses and stays out of
 });
 test('Backups preserve old Calculus item versions together with Algebra records',()=>{
  const old=calculusQuestions.filter(q=>['1.0.0','1.1.0'].includes(q.version)).filter((q,i)=>i===0||i===635).map((q,i)=>answer(q,i)),records=[...old,...set(34)];
- assert.equal(validateAttempts(records,catalog.questions).length,12);
- for(const version of catalog.COMPATIBLE_BANK_VERSIONS)assert.deepEqual(validateBackup({schemaVersion:1,bankVersion:version,attempts:records},catalog.questions,catalog.COMPATIBLE_BANK_VERSIONS),records);
+ assert.equal(validateAttempts(records,catalog.attemptQuestions).length,12);
+ for(const version of catalog.COMPATIBLE_BANK_VERSIONS)assert.deepEqual(validateBackup({schemaVersion:1,bankVersion:version,attempts:records},catalog.attemptQuestions,catalog.COMPATIBLE_BANK_VERSIONS),records);
  const memory=new Map(),storage={getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)};
  for(const course of Object.keys(COURSES)){assert.equal(saveCourse(storage,course),true);assert.equal(readCourse(storage),course);}
 });

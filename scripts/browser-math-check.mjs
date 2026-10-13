@@ -3,7 +3,8 @@
 import {writeFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {enterCourse} from './browser-course-setup.mjs';
-import {questions,BANK_VERSION} from '../data/questions.mjs';
+import {questions,BANK_VERSION} from '../data/catalog.mjs';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const target=targets.find(t=>t.type==='page');
 if(!target)throw new Error('No isolated Chrome page is available.');
@@ -32,7 +33,7 @@ const start=async id=>{
   await waitFor('!!document.querySelector(".question-title")');
 };
 const answer=async id=>{
-  const q=questions.find(q=>q.id===id);
+  const q=questions.find(q=>(q.replaces??q.id)===id);
   await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');
   await waitFor('!!document.querySelector(".answer-feedback")');
   await click('[data-action="next"]');
@@ -43,7 +44,7 @@ await mkdir('test-results',{recursive:true});
 try{
   await send('Runtime.enable');await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000'});
+  await send('Page.navigate',{url:appURL});
   await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1")');
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');

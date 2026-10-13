@@ -4,7 +4,8 @@ import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {enterCourse} from './browser-course-setup.mjs';
-import {questions,BANK_VERSION} from '../data/questions.mjs';
+import {questions,BANK_VERSION} from '../data/catalog.mjs';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 import {masteryFill} from '../src/graph.mjs';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const target=targets.find(t=>t.type==='page');
@@ -37,7 +38,7 @@ const answer=async(correct=true)=>{
 try{
   await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000'});await enterCourse(run,waitFor);
+  await send('Page.navigate',{url:appURL});await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1")');
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
   await click('[data-view="practice"]');assert.deepEqual(await nextCheck(),{target:'1.2',kind:'start',anchor:''});
@@ -98,11 +99,11 @@ try{
   // A live recommendation must update even with an unfinished quiz in memory.
   await click('[data-view="practice"]');await change('#practice-concept','1.5');await click('[data-action="start-picked"]');
   await click('[data-view="graph"]');
-  const {targetId:otherId}=await send('Target.createTarget',{url:'http://127.0.0.1:3000'});
+  const {targetId:otherId}=await send('Target.createTarget',{url:appURL});
   const {sessionId:other}=await send('Target.attachToTarget',{targetId:otherId,flatten:true});
   for(let i=0;i<60;i++){if(await run('!!document.querySelector(".explore-home")',other))break;await new Promise(r=>setTimeout(r,100));}
   await run('document.querySelector("[data-view=practice]").click();const s=document.querySelector("#practice-concept");s.value="1.11";s.dispatchEvent(new Event("change",{bubbles:true}));document.querySelector("[data-action=start-picked]").click()',other);
-  const q=questions.find(q=>q.id==='1.11-Q1'),wrong=q.options.find(o=>o.id!==q.correctOptionId).id;
+  const q=questions.find(q=>(q.replaces??q.id)==='1.11-Q1'),wrong=q.options.find(o=>o.id!==q.correctOptionId).id;
   await run(`document.querySelector('input[value="${wrong}"]').click();document.querySelector('[data-action=submit]').click()`,other);
   await waitFor('document.querySelector(".next-check").dataset.anchor==="1.11"');
   assert.equal((await nextCheck()).kind,'prerequisite');

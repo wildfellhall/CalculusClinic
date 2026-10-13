@@ -4,7 +4,8 @@ import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {enterCourse} from './browser-course-setup.mjs';
-import {questions,BANK_VERSION} from '../data/questions.mjs';
+import {questions,BANK_VERSION} from '../data/catalog.mjs';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 import {masteryFill} from '../src/graph.mjs';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const target=targets.find(t=>t.type==='page');
@@ -30,7 +31,7 @@ await mkdir('test-results',{recursive:true});
 try{
   await send('Runtime.enable');await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000'});
+  await send('Page.navigate',{url:appURL});
   await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1");localStorage.setItem("qa-unrelated-data","keep-me")');
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
@@ -82,6 +83,9 @@ try{
   await run('(()=>{const s=document.querySelector("#search");s.value="Taylor";s.dispatchEvent(new Event("input",{bubbles:true}));})()');
   assert.ok(await run('document.querySelectorAll("tbody tr").length>=2'));
   await change('#course','AB');
+  assert.equal(await run('document.querySelector("#search").value'),'');
+  assert.equal(await run('document.querySelectorAll("tbody tr").length'),97);
+  await run('(()=>{const s=document.querySelector("#search");s.value="Taylor";s.dispatchEvent(new Event("input",{bubbles:true}));})()');
   assert.equal(await run('document.querySelectorAll("tbody tr").length'),0);
   await click('[data-action="clear-search"]');
   assert.equal(await run('document.querySelectorAll("tbody tr").length'),97);
@@ -98,8 +102,8 @@ try{
   assert.equal(await run('document.querySelectorAll(".detail-section").length'),4);
   await click('[data-action="practice"][data-id="1.11"]');
   assert.ok(await run('document.querySelector(".question-meta").textContent.includes("QUESTION 1 OF 10")'));
-  const correct=questions.find(q=>q.id==='1.11-Q1').correctOptionId;
-  const wrong=questions.find(q=>q.id==='1.11-Q1').options.find(o=>o.id!==correct).id;
+  const correct=questions.find(q=>(q.replaces??q.id)==='1.11-Q1').correctOptionId;
+  const wrong=questions.find(q=>(q.replaces??q.id)==='1.11-Q1').options.find(o=>o.id!==correct).id;
   assert.equal(await run('document.querySelector("#check-answer").disabled'),true);
   await click(`input[value="${wrong}"]`);await click('[data-action="submit"]');
   assert.ok(await run('document.querySelector(".answer-feedback").textContent.includes("revisit")'));
@@ -111,7 +115,7 @@ try{
   await click('[data-action="view"][data-view="practice"]');
   await click('[data-action="next"]');
   for(let n=2;n<=10;n++){
-    const q=questions.find(q=>q.id===`1.11-Q${n}`);await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');
+    const q=questions.find(q=>(q.replaces??q.id)===`1.11-Q${n}`);await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');
     if(n===2){await click('[data-action="view"][data-view="graph"]');await assertMastery('1.11',.1);await click('[data-action="view"][data-view="practice"]');}
   }
   assert.equal(await run('document.querySelector(".result-number").textContent.trim()'),'9 / 10');
@@ -181,7 +185,7 @@ try{
   console.log('PASS deletion cancellation, Escape, safe focus and failed-storage preservation');
 
   // Open another tab on the same isolated origin, with a practice set in progress.
-  const {targetId:otherId}=await send('Target.createTarget',{url:'http://127.0.0.1:3000'});
+  const {targetId:otherId}=await send('Target.createTarget',{url:appURL});
   const {sessionId:other}=await send('Target.attachToTarget',{targetId:otherId,flatten:true});
   for(let i=0;i<60;i++){if(await run('!!document.querySelector(".explore-home")',other))break;await new Promise(r=>setTimeout(r,100));}
   await run('document.querySelector("[data-view=practice]").click();document.querySelector("[data-action=start-picked]").click()',other);
@@ -204,23 +208,26 @@ try{
   console.log('PASS confirmed deletion, unrelated-data preservation, cross-tab reset and reload');
 
   const legacyBackup={...backup,bankVersion:'1.0.0',attempts:backup.attempts.filter(a=>a.bankVersion==='1.0.0')};
+  // Four unrevised questions in this set still have the original bank version.
+  // Retired wording and mixed-version migration are tested in browser-revisions-check.
+  assert.equal(legacyBackup.attempts.length,4);
   await writeFile(resolve(downloadDirectory,'legacy-progress.json'),JSON.stringify(legacyBackup));
   await click('[data-action="view"][data-view="settings"]');
   await importFile(resolve(downloadDirectory,'legacy-progress.json'));
-  await waitFor('document.querySelector("#toast").textContent.includes("Imported 6")');
+  await waitFor('document.querySelector("#toast").textContent.includes("Imported 4")');
   await click('[data-action="view"][data-view="progress"]');
-  assert.deepEqual(await run('[...document.querySelectorAll(".progress-summary strong")].map(x=>x.textContent)'),['80%','100%','6']);
-  assert.equal(await run('document.querySelector("tbody tr td:nth-child(2)").textContent'),'5/10');
-  await click('[data-action="view"][data-view="graph"]');await assertMastery('1.11',.5);
+  assert.deepEqual(await run('[...document.querySelectorAll(".progress-summary strong")].map(x=>x.textContent)'),['100%','100%','4']);
+  assert.equal(await run('document.querySelector("tbody tr td:nth-child(2)").textContent'),'4/10');
+  await click('[data-action="view"][data-view="graph"]');await assertMastery('1.11',.4);
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
   assert.equal(await run('!!document.querySelector(".storage-warning")'),false);
   await click('[data-action="view"][data-view="practice"]');await click('[data-action="start-picked"]');
-  assert.ok(await run('document.querySelector(".answer-options input").value.startsWith("1.11-Q6-")'));
+  assert.ok(await run('document.querySelector(".answer-options input").value.startsWith("1.11-R2-Q1-")'));
   await shot('new-question-desktop');
   await click('[data-action="view"][data-view="settings"]');
   await importFile(resolve(downloadDirectory,'calculus-clinic-progress.json'));
-  await waitFor('document.querySelector("#toast").textContent.includes("Imported 5")');
-  console.log('PASS legacy backup import, reload, 5/10 coverage and unanswered new questions first');
+  await waitFor('document.querySelector("#toast").textContent.includes("Imported 7")');
+  console.log('PASS legacy backup import, reload, 4/10 coverage and unanswered new questions first');
   await click('[data-action="view"][data-view="progress"]');
   assert.deepEqual(await run('[...document.querySelectorAll(".progress-summary strong")].map(x=>x.textContent)'),['90%','100%','11']);
   await click('[data-action="view"][data-view="settings"]');
@@ -274,10 +281,10 @@ try{
   console.log('PASS full/unit/focus graph, other connections, map export, mobile navigation and layout');
 
   for(const path of ['concepts.csv','relationships.csv','questions.csv','coverage.csv','ontology.json','concept-map.svg']){
-    const response=await fetch('http://127.0.0.1:3000/data/'+path);assert.equal(response.status,200,path);assert.ok((await response.text()).length>100,path);
+    const response=await fetch(appURL+'/data/'+path);assert.equal(response.status,200,path);assert.ok((await response.text()).length>100,path);
   }
-  const exported=await (await fetch('http://127.0.0.1:3000/data/ontology.json')).json();
-  assert.equal(exported.questions.length,1270);
+  const exported=await (await fetch(appURL+'/data/ontology.json')).json();
+  assert.equal(exported.questions.length,2130);
   assert.ok(exported.concepts.every(c=>exported.questions.filter(q=>q.conceptId===c.id).length===10));
 
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
@@ -307,7 +314,7 @@ try{
   await click('.map-options summary');
   await click('[data-action="zoom-in"]');
   const savedViewport=await run('document.querySelector("#graph-world").getAttribute("transform")');
-  const {targetId:masteryTabId}=await send('Target.createTarget',{url:'http://127.0.0.1:3000'});
+  const {targetId:masteryTabId}=await send('Target.createTarget',{url:appURL});
   const {sessionId:masteryTab}=await send('Target.attachToTarget',{targetId:masteryTabId,flatten:true});
   for(let i=0;i<60;i++){if(await run('!!document.querySelector(".explore-home")',masteryTab))break;await new Promise(r=>setTimeout(r,100));}
   await run('document.querySelector("[data-view=practice]").click();document.querySelector("[data-action=start-picked]").click()',masteryTab);

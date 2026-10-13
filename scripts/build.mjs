@@ -1,5 +1,6 @@
 import {mkdir,writeFile,cp} from 'node:fs/promises';
-import {concepts,relationships,units,sources,standards,questions,BANK_VERSION,COMPATIBLE_BANK_VERSIONS} from '../data/catalog.mjs';
+import {concepts,relationships,units,sources,standards,questions,archivedQuestions,BANK_VERSION,COMPATIBLE_BANK_VERSIONS} from '../data/catalog.mjs';
+import {curriculumCoverage,COVERAGE_SCOPE} from '../data/coverage.mjs';
 import {COURSES,courseIncludes} from '../src/course.mjs';
 import {csv,topologicalOrder} from '../src/core.mjs';
 import {graphLayout,drawGraph} from '../src/graph.mjs';
@@ -12,21 +13,29 @@ for(const c of concepts){
 await mkdir('dist/data',{recursive:true});
 await mkdir('dist/src',{recursive:true});
 const metadata={schemaVersion:'1.1.0',bankVersion:BANK_VERSION,compatibleBankVersions:COMPATIBLE_BANK_VERSIONS,updated:'2026-10-12',granularity:'Concept groups with explicit subskills and course membership',questionCount:questions.length,conceptCount:concepts.length,scope:'AP Calculus AB/BC and Texas TEKS Algebra I/II, including prerequisite support',edgeDirection:'prerequisite → dependent',dependencyStatus:'Author-designed teaching model, not an official standards dependency graph',assessmentStatus:'Original sampled practice; not psychometrically calibrated; coverage does not establish mastery of every standard'};
-const bundle={metadata,courses:COURSES,units,concepts,relationships,questions,sources,standards};
+const coverage=curriculumCoverage(concepts,questions,standards);
+metadata.coverageScope=COVERAGE_SCOPE;
+metadata.revisedQuestionCount=archivedQuestions.length;
+metadata.historyPolicy='Replaced questions have new IDs. Earlier attempts remain available in history and backups; current accuracy and diagnostic passing use current questions only. Node camera observations retain their original history.';
+const bundle={metadata,courses:COURSES,units,concepts,relationships,questions,archivedQuestions,sources,standards};
 await writeFile('dist/data/bundle.js','window.CALCULUS_DATA='+JSON.stringify({...bundle,mathText:compileMathText(concepts,questions)}).replaceAll('<','\\u003c')+';\n');
 async function exportCurriculum(path,nodes,items,edges,course=null){
  await mkdir(path,{recursive:true});
  const ids=new Set(nodes.map(c=>c.id));
- const refs=standards.filter(s=>s.conceptIds.some(id=>ids.has(id))).map(s=>({...s,conceptIds:s.conceptIds.filter(id=>ids.has(id))}));
+ const itemIds=new Set(items.map(q=>q.id));
+ const aligned=coverage.filter(s=>s.conceptIds.some(id=>ids.has(id))).map(s=>{const questionIds=s.questionIds.filter(id=>itemIds.has(id));return {...s,conceptIds:s.conceptIds.filter(id=>ids.has(id)),questionIds,questionCount:questionIds.length};});
+ const refs=aligned.filter(s=>!s.id.startsWith('AP.'));
  const info={...metadata,...(course?{course,title:COURSES[course].title}:{}),conceptCount:nodes.length,questionCount:items.length};
- await writeFile(path+'/ontology.json',JSON.stringify({metadata:info,units:units.filter(u=>nodes.some(c=>c.unit===u.id)),concepts:nodes,relationships:edges,questions:items,sources,standards:refs},null,2));
+ await writeFile(path+'/ontology.json',JSON.stringify({metadata:info,units:units.filter(u=>nodes.some(c=>c.unit===u.id)),concepts:nodes,relationships:edges,questions:items,sources,standards:refs,coverage:aligned},null,2));
+ await writeFile(path+'/archived-questions.json',JSON.stringify({bankVersion:BANK_VERSION,historyPolicy:metadata.historyPolicy,questions:archivedQuestions.filter(q=>ids.has(q.conceptId))},null,2));
  const rows=nodes.map(c=>({...c,unitTitle:units[c.unit].title,dependents:edges.filter(e=>e.type==='prerequisite'&&e.source===c.id).map(e=>e.target),sourceUrl:sources.find(s=>s.id===c.sourceIds.at(-1))?.url??'',questionIds:items.filter(q=>q.conceptId===c.id).map(q=>q.id)}));
  await writeFile(path+'/concepts.csv',csv(rows,['id','title','curriculum','unit','unitTitle','scope','cedTopic','algebraLevel','alignment','standardIds','objective','subskills','rule','prerequisites','dependents','misconception','firstStep','potentialFriction','support','representations','practices','questionIds','sourceIds','sourceUrl']));
  await writeFile(path+'/relationships.csv',csv(edges,['source','target','type','rationale','provenance','requiredFor']));
- await writeFile(path+'/questions.csv',csv(items.map(q=>({...q,optionA:q.options[0].text,optionAId:q.options[0].id,optionB:q.options[1].text,optionBId:q.options[1].id,optionC:q.options[2].text,optionCId:q.options[2].id,correctAnswer:q.options.find(o=>o.id===q.correctOptionId).text})),['id','conceptId','version','prompt','optionAId','optionA','optionBId','optionB','optionCId','optionC','correctOptionId','correctAnswer','explanation','format','authorship','validation']));
+ await writeFile(path+'/questions.csv',csv(items.map(q=>({...q,standardIds:aligned.filter(s=>s.questionIds.includes(q.id)).map(s=>s.id),optionA:q.options[0].text,optionAId:q.options[0].id,optionB:q.options[1].text,optionBId:q.options[1].id,optionC:q.options[2].text,optionCId:q.options[2].id,correctAnswer:q.options.find(o=>o.id===q.correctOptionId).text})),['id','conceptId','version','replaces','standardIds','prompt','optionAId','optionA','optionBId','optionB','optionCId','optionC','correctOptionId','correctAnswer','explanation','format','authorship','validation']));
  await writeFile(path+'/concept-map.svg',drawGraph(graphLayout(nodes,edges),units,{standalone:true,title:`${course?COURSES[course].title:'Calculus Clinic'} · Concept dependencies`}));
- const coverage=course?.startsWith('ALG')?refs.filter(s=>s.course===course).map(s=>({...s,questionCount:s.conceptIds.reduce((sum,id)=>sum+items.filter(q=>q.conceptId===id).length,0)})):nodes.filter(c=>c.cedTopic).map(c=>({cedTopic:c.cedTopic,conceptId:c.id,scope:c.scope,questionCount:items.filter(q=>q.conceptId===c.id).length}));
- await writeFile(path+'/coverage.csv',csv(coverage,course?.startsWith('ALG')?['id','reference','course','kind','summary','conceptIds','questionCount','coverage','sourceUrl']:['cedTopic','conceptId','scope','questionCount']));
+ const courseCoverage=course?.startsWith('ALG')?aligned.filter(s=>s.course===course):aligned;
+ await writeFile(path+'/coverage.csv',csv(courseCoverage,['id','reference','course','kind','summary','conceptIds','questionIds','questionCount','coverage','assessmentLimit','sourceUrl']));
+ await writeFile(path+'/question-audit.csv',csv(nodes.map(c=>{const qs=items.filter(q=>q.conceptId===c.id);return {conceptId:c.id,title:c.title,subskills:c.subskills,questionCount:qs.length,revisedQuestions:qs.filter(q=>q.replaces).length,retainedQuestions:qs.filter(q=>!q.replaces).length,questionIds:qs.map(q=>q.id),scope:c.scope,reviewed:metadata.updated,reviewScope:'Calculation, modeling, and reasoning about specified mathematical cases; ten sampled items per node'};}),['conceptId','title','scope','subskills','questionCount','revisedQuestions','retainedQuestions','questionIds','reviewed','reviewScope']));
 }
 await exportCurriculum('dist/data',concepts,questions,relationships);
 for(const course of Object.keys(COURSES)){

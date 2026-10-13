@@ -4,7 +4,8 @@ import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {enterCourse} from './browser-course-setup.mjs';
-import {questions,BANK_VERSION} from '../data/questions.mjs';
+import {questions,BANK_VERSION} from '../data/catalog.mjs';
+const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 import {masteryFill} from '../src/graph.mjs';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const target=targets.find(t=>t.type==='page');
@@ -30,17 +31,23 @@ await mkdir('test-results',{recursive:true});
 const elapsed=()=>run('Number(document.querySelector("#question-timer").dataset.durationMs)');
 const advance=async ms=>{await run(`window.qaTimeOffset+=${ms}`);await new Promise(r=>setTimeout(r,300));};
 try{
-  await send('Runtime.enable');
+  await send('Runtime.enable');await send('Page.enable');
+  // Camera calibration pauses the clock by design. This suite isolates answer
+  // timing; camera/calibration behavior has its own tests.
+  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA camera denied','NotAllowedError')};`});
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000'});await enterCourse(run,waitFor);
+  await send('Page.navigate',{url:appURL});await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1")');
-  await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
+  const initialDocument=await run('window.qaDocument');
+  await send('Page.reload');await waitFor(`window.qaDocument!==${JSON.stringify(initialDocument)}&&!!document.querySelector(".explore-home")`);
   await send('Page.bringToFront');
   await run('window.qaTimeOffset=0;window.qaNativeNow=performance.now.bind(performance);performance.now=()=>window.qaNativeNow()+window.qaTimeOffset');
   await click('[data-view="practice"]');await change('#practice-concept','1.11');await click('[data-action="start-picked"]');
   assert.equal(await run('document.querySelector("#question-timer").getAttribute("aria-live")'),'off');
   await waitFor('document.querySelector("#timer-status").textContent==="Active time"');
-  await new Promise(r=>setTimeout(r,1150));assert.ok(await elapsed()>=1000);
+  // Wait for the rendered clock tick, whose 250 ms interval is independent of
+  // question selection and can be delayed by rendering on slower machines.
+  await waitFor('Number(document.querySelector("#question-timer").dataset.durationMs)>=1000');
   await advance(10_000);const beforeLeave=await elapsed();assert.ok(beforeLeave>=11_000);
   await click('[data-view="graph"]');await advance(45_000);
   await click('[data-view="practice"]');
@@ -57,7 +64,7 @@ try{
   await shot('question-timer-desktop');
   await click('.timing-help summary');assert.ok(await run('document.querySelector(".timing-help p").textContent.includes("at most 3 percentage points")'));
   await click('.timing-help summary');
-  const q=questions.find(q=>q.id==='1.11-Q1');
+  const q=questions.find(q=>(q.replaces??q.id)==='1.11-Q1');
   await click(`input[value="${q.correctOptionId}"]`);await click('[data-action="submit"]');
   const recorded=await run('JSON.parse(localStorage.getItem("calculus-clinic-progress-v1")).attempts[0].durationMs');
   assert.ok(Number.isSafeInteger(recorded)&&recorded>=11_000&&recorded<20_000);
@@ -89,8 +96,8 @@ try{
   await click('[data-view="graph"]');await assertMastery('1.11',.1);
   // Retrying the original question starts a fresh clock after the other nine.
   await click('[data-action="practice"][data-id="1.11"]');
-  for(let n=2;n<=10;n++){const item=questions.find(q=>q.id===`1.11-Q${n}`);await click(`input[value="${item.correctOptionId}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');}
-  assert.ok(await run('document.querySelector(".answer-options input").value.startsWith("1.11-Q1-")'));
+  for(let n=2;n<=10;n++){const item=questions.find(q=>(q.replaces??q.id)===`1.11-Q${n}`);await click(`input[value="${item.correctOptionId}"]`);await click('[data-action="submit"]');await click('[data-action="next"]');}
+  assert.ok(await run('document.querySelector(".answer-options input").value.startsWith("1.11-R2-Q1-")'));
   assert.ok(await elapsed()<1000);
   console.log('PASS durations persist through history, CSV, backups, deletion/import, reload, and a fresh retry clock');
 

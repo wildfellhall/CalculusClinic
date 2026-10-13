@@ -1,7 +1,7 @@
 // Run in an isolated Chrome profile on port 9224 with fake media devices only.
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
-import {questions} from '../data/questions.mjs';
+import {questions} from '../data/catalog.mjs';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl),pending=new Map(),errors=[];let seq=0;

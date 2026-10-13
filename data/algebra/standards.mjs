@@ -11,7 +11,7 @@ A|1G|Explain and justify using precise language|30,55,61
 A|2A|Linear domain and range in continuous or discrete contexts|49
 A|2B|Write lines in three standard forms|50
 A|2C|Write lines from tables, graphs, or descriptions|45,50
-A|2D|Write direct-variation equations|39
+A|2D|Write and solve direct-variation equations|39
 A|2E|Parallel line through a point|50
 A|2F|Perpendicular line through a point|50
 A|2G|Horizontal and vertical lines|50
@@ -25,7 +25,7 @@ A|3E|Transform the linear parent function|51
 A|3F|Graph solutions of two-equation systems|48
 A|3G|Estimate contextual system solutions graphically|48
 A|3H|Graph systems of two linear inequalities|54
-A|4A|Use correlation to interpret linear association|55
+A|4A|Calculate correlation using technology and interpret linear association|55
 A|4B|Distinguish association and causation|55
 A|4C|Fit linear models and predict|55
 A|5A|Solve one-variable linear equations|34
@@ -85,7 +85,7 @@ A2|4G|Identify extraneous square-root solutions|75
 A2|4H|Solve quadratic inequalities|76
 A2|5A|Transform exponential and logarithmic functions|77
 A2|5B|Model situations with exponential or logarithmic equations|78
-A2|5C|Convert between exponential and logarithmic forms|77
+A2|5C|Convert between exponential and logarithmic forms|77,78
 A2|5D|Solve exponential and single-log equations|78
 A2|5E|Check reasonableness of logarithmic solutions|78
 A2|6A|Transform cubic and cube-root functions|68
