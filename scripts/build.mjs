@@ -22,7 +22,7 @@ await writeFile('dist/data/questions.csv',csv(questions.map(q=>({...q,optionA:q.
 await writeFile('dist/data/concept-map.svg',drawGraph(graphLayout(concepts,relationships),units,{standalone:true}));
 const coverage=units.filter(u=>u.id).flatMap(u=>concepts.filter(c=>c.unit===u.id).map(c=>({cedTopic:c.cedTopic,conceptId:c.id,scope:c.scope,questionCount:questions.filter(q=>q.conceptId===c.id).length})));
 await writeFile('dist/data/coverage.csv',csv(coverage,['cedTopic','conceptId','scope','questionCount']));
-for(const file of ['app.mjs','core.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
+for(const file of ['app.mjs','core.mjs','course.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
 for(const file of ['index.html','styles.css'])await cp('src/'+file,'dist/'+file);
 await cp('public','dist',{recursive:true});
 await mkdir('dist/vendor/katex',{recursive:true});

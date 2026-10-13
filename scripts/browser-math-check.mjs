@@ -2,6 +2,7 @@
 // Start headless Chrome with --remote-debugging-port=9224, then run this script.
 import {writeFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {enterCourse} from './browser-course-setup.mjs';
 import {questions,BANK_VERSION} from '../data/questions.mjs';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
 const target=targets.find(t=>t.type==='page');
@@ -43,7 +44,7 @@ try{
   await send('Runtime.enable');await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await send('Page.navigate',{url:'http://127.0.0.1:3000'});
-  await waitFor('!!document.querySelector(".explore-home")');
+  await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1")');
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
   await start('1.6');

@@ -11,6 +11,7 @@ import {CameraAccess,CAMERA_ACCESS_KEY} from './camera-access.mjs';
 import {selfReport,observationStats,observationColumns} from './observations.mjs';
 import {renderObservationPanel,renderNodeObservations,observationMethod,scoreText} from './observation-ui.mjs';
 import {reportData} from './report-data.mjs';
+import {COURSES,readCourse,saveCourse} from './course.mjs';
 
 const {concepts,relationships,questions,units,sources,metadata}=window.CALCULUS_DATA;
 const math=text=>formatMathText(text,window.CALCULUS_DATA.mathText);
@@ -21,7 +22,9 @@ document.addEventListener('toggle',refreshMathOverflow,true);
 const byId=new Map(concepts.map(c=>[c.id,c]));
 const qs=id=>questions.filter(q=>q.conceptId===id);
 const pct=value=>value===null?'—':Math.round(value*100)+'%';
-const state={view:'atlas',tab:'browse',unit:'all',selected:'1.11',course:'BC',query:'',graphScope:'focus',graphMode:'accuracy',scoringPreferences:normalizeScoringPreferences(),connections:false,progressFilter:'started',quiz:null,attempts:[],storageMessage:''};
+const browserStorage={getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)};
+const savedCourse=readCourse(browserStorage);
+const state={view:'atlas',tab:'browse',unit:'all',selected:'1.11',course:savedCourse||'BC',onboarding:!savedCourse,query:'',graphScope:'focus',graphMode:'accuracy',scoringPreferences:normalizeScoringPreferences(),connections:false,progressFilter:'started',quiz:null,attempts:[],storageMessage:''};
 try{
   const saved=localStorage.getItem(STORAGE_KEY);
   if(saved){const parsed=JSON.parse(saved);if(parsed.schemaVersion!==1)throw new Error('Unsupported storage version');state.attempts=validateAttempts(parsed.attempts,questions);state.graphMode=normalizeGraphMode(parsed.graphMode);state.scoringPreferences=normalizeScoringPreferences(parsed.scoringPreferences);}
@@ -32,7 +35,7 @@ let reportBusy=false;
 let autoCameraSession=null,pageActive=true;
 const questionClock=new QuestionClock();
 const camera=new MovementCamera(()=>{syncQuestionClock();updateCameraUI();});
-const cameraAccess=new CameraAccess({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},mediaDevices:navigator.mediaDevices,permissions:navigator.permissions,secure:isSecureContext,
+const cameraAccess=new CameraAccess({storage:browserStorage,mediaDevices:navigator.mediaDevices,permissions:navigator.permissions,secure:isSecureContext,
   onRevoke:()=>camera.stop(),onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
 function updateQuestionTimer(){
   const el=document.querySelector('#question-timer'),label=document.querySelector('#timer-status');
@@ -195,7 +198,28 @@ function unitPicker(){
   return `<label class="unit-picker"><span class="sr-only">Browse a unit</span><select id="unit-filter"><option value="all" ${state.unit==='all'?'selected':''}>All units</option>${units.filter(u=>state.course==='BC'||u.id<9).map(u=>`<option value="${u.id}" ${state.unit===u.id?'selected':''}>${u.id===0?'Foundations':`Unit ${u.id}`} · ${esc(u.title)}</option>`).join('')}</select></label>`;
 }
 function searchField(){return `<label class="search"><span class="sr-only">Search all concepts</span><input id="search" type="search" value="${esc(state.query)}" placeholder="Search concepts, skills, or topic numbers…" autocomplete="off"></label>`;}
+function renderOnboarding(){
+  return `<header class="site-header"><div class="topbar"><span class="brand"><span class="brand-mark" aria-hidden="true">∫</span><span>calculus clinic</span></span></div></header>
+    <main id="main" tabindex="-1"><section class="course-onboarding" aria-labelledby="onboarding-title"><h1 id="onboarding-title">Choose your calculus path<span class="heading-dot" aria-hidden="true">.</span></h1><p class="course-intro">You can switch courses later. Your saved progress stays with you.</p><div class="course-options">${Object.entries(COURSES).map(([course,info])=>{
+      const count=concepts.filter(c=>course==='BC'||c.scope!=='BC only').length;
+      return `<button class="course-option course-option-${course.toLowerCase()}" data-action="choose-course" data-course="${course}" aria-label="Choose ${info.title}" aria-describedby="course-description-${course}"><span class="course-monogram" aria-hidden="true">${course}</span><span class="course-option-title">${info.title}</span><span class="course-description" id="course-description-${course}">${info.description}</span><span class="course-count">${count} concepts, including prerequisites</span><span class="course-begin">Choose ${course} <span aria-hidden="true">→</span></span></button>`;
+    }).join('')}</div></section></main>`;
+}
+function chooseCourse(course){
+  if(!Object.hasOwn(COURSES,course))return;
+  const firstChoice=state.onboarding;
+  state.course=course;state.onboarding=false;state.quiz=null;
+  if(!eligible(byId.get(state.selected))){state.selected='1.11';state.unit=1;}
+  if(state.unit!=='all'&&state.unit>8&&course==='AB')state.unit=1;
+  const saved=saveCourse(browserStorage,course);
+  render();
+  if(firstChoice){const heading=document.querySelector('.explore-home h1');heading.tabIndex=-1;heading.focus({preventScroll:true});}
+  if(!saved)toast('Your course is selected for this visit. This browser could not save the choice.');
+  announce(`${COURSES[course].title} selected.`);
+  if(!document.hidden)void cameraAccess.initialize();
+}
 function render(){
+  if(state.onboarding){document.querySelector('#app').innerHTML=renderOnboarding();return;}
   refreshDiagnostic();
   const active=document.activeElement,focusId=active?.id,selection=active?.selectionStart;
   const c=byId.get(state.selected),overall=stats(state.attempts,questions.filter(q=>eligible(byId.get(q.conceptId))).map(q=>q.id));
@@ -336,6 +360,7 @@ window.addEventListener('resize',()=>{if(state.view==='graph'||(state.view==='at
 document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action]');if(!el)return;const {action,id}=el.dataset;
   if(el.tagName==='A')e.preventDefault();
+  if(action==='choose-course'){chooseCourse(el.dataset.course);return;}
   if(action==='select')return selectConcept(id);
   if(action==='export-report'){void exportReport();return;}
   if(action==='graph-mode'){setGraphMode(el.dataset.mode);return;}
@@ -385,7 +410,7 @@ document.addEventListener('change',async e=>{
   const el=e.target;
   if(el.id.startsWith('checkin-')&&state.quiz&&!state.quiz.answered){state.quiz.checkIn??={};state.quiz.checkIn[el.id.slice(8)]=el.id==='checkin-intensity'?Number(el.value)||null:el.value;updateCheckInScore();return;}
   if(el.name==='answer'){if(!state.quiz||state.quiz.answered)return;state.quiz.choice=el.value;document.querySelectorAll('.answer-option').forEach(n=>n.classList.toggle('chosen',n.querySelector('input').checked));document.querySelector('#check-answer').disabled=false;return;}
-  if(el.id==='course'){state.course=el.value;state.quiz=null;if(!eligible(byId.get(state.selected))){state.selected='1.11';state.unit=1;}if(state.unit!=='all'&&state.unit>8&&state.course==='AB')state.unit=1;render();}
+  if(el.id==='course'){chooseCourse(el.value);return;}
   if(el.id==='unit-filter'){state.unit=el.value==='all'?'all':Number(el.value);state.query='';render();}
   if(el.id==='graph-concept'){state.selected=el.value;state.graphScope='focus';render();}
   if(el.id==='include-self-reports'){state.scoringPreferences=normalizeScoringPreferences({includeSelfReports:el.checked});persist();renderStoredProgress();announce('Check-in contribution '+(state.scoringPreferences.includeSelfReports?'enabled':'disabled'));return;}
@@ -403,7 +428,7 @@ function renderStoredProgress(){
   render();
   if(viewport&&document.querySelector('#map-svg')){Object.assign(graphState,viewport);transformGraph();}
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!state.onboarding)void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
 window.addEventListener('blur',()=>{syncQuestionClock(false);updateCameraUI();});
 window.addEventListener('focus',()=>{syncQuestionClock();updateCameraUI();});
 window.addEventListener('pagehide',()=>{pageActive=false;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
@@ -421,4 +446,4 @@ window.addEventListener('storage',e=>{
   }catch{/* Retain the valid session if another tab writes invalid data. */}
 });
 render();
-if(!document.hidden)void cameraAccess.initialize();
+if(!document.hidden&&!state.onboarding)void cameraAccess.initialize();

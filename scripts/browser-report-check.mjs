@@ -1,5 +1,6 @@
 // Isolated browser QA for local PDF downloads; fabricated records only.
 import assert from 'node:assert/strict';
+import {enterCourse} from './browser-course-setup.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {PDFDocument} from 'pdf-lib';
 import {questions} from '../data/questions.mjs';
@@ -26,7 +27,7 @@ const saveDownload=async(index,name)=>{
 try{
   await mkdir('test-results/pdfs',{recursive:true});await send('Runtime.enable');await send('Network.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:appURL+'/'});await waitFor('!!document.querySelector(".explore-home")');
+  await send('Page.navigate',{url:appURL+'/'});await enterCourse(run,waitFor);
   await run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({schemaVersion:1,attempts:${JSON.stringify(fixture)}}))`);
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');await click('[data-view="graph"]');
   const original=await stored();assert.equal(await run('typeof PDFLib'),'undefined');assert.equal(await run('typeof fontkit'),'undefined');

@@ -1,6 +1,7 @@
 // Isolated Chrome QA only. Start with a fresh profile, fake media devices,
 // --use-fake-ui-for-media-stream and software WebGL enabled. Never use a real camera.
 import assert from 'node:assert/strict';
+import {enterCourse} from './browser-course-setup.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 const qaURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
@@ -14,7 +15,7 @@ const click=s=>run(`document.querySelector(${JSON.stringify(s)}).click()`);
 const change=(s,value)=>run(`(()=>{const e=document.querySelector(${JSON.stringify(s)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 const stored=()=>run('JSON.parse(localStorage.getItem("calculus-clinic-progress-v1"))?.attempts||[]');
 const snap=async name=>{await run('await document.fonts.ready.then(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))');const r=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile('test-results/'+name+'.png',Buffer.from(r.data,'base64'));};
-const loadPage=async(method,params={})=>{const previous=await run('window.qaDocument??null');await send(method,params);await waitFor(`!!window.qaDocument&&window.qaDocument!==${JSON.stringify(previous)}&&document.readyState==='complete'&&!!document.querySelector('.explore-home')`);};
+const loadPage=async(method,params={})=>{const previous=await run('window.qaDocument??null');await send(method,params);await waitFor(`!!window.qaDocument&&window.qaDocument!==${JSON.stringify(previous)}&&document.readyState==='complete'&&!!document.querySelector('.course-onboarding, .explore-home')`);await enterCourse(run,waitFor);};
 try{
   await mkdir('test-results',{recursive:true});await send('Runtime.enable');await send('Network.enable');await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1280,height:1000,screenWidth:1280,screenHeight:1000,deviceScaleFactor:1,mobile:false});

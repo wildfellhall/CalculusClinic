@@ -1,5 +1,6 @@
 // Graph-view QA in an isolated Chrome profile on port 9224. Uses fabricated records; no camera access.
 import assert from 'node:assert/strict';
+import {enterCourse} from './browser-course-setup.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {questions} from '../data/questions.mjs';
 import {METRICS,calibrate,MovementSummary,selfReport} from '../src/observations.mjs';
@@ -33,7 +34,7 @@ const profile=()=>run('Object.fromEntries([...document.querySelectorAll(".profil
 try{
   await mkdir('test-results',{recursive:true});await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,screenWidth:1440,screenHeight:1080,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:appURL+'/'});await waitFor('!!document.querySelector(".explore-home")');
+  await send('Page.navigate',{url:appURL+'/'});await enterCourse(run,waitFor);
   await seed();await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');await click('[data-view="graph"]');
   assert.deepEqual(await run('[...document.querySelector("#graph-mode").options].map(o=>o.value)'),['accuracy','combined','movement']);
   const original=await stored(),recommendation=await run('document.querySelector(".next-check").dataset.nextConcept');

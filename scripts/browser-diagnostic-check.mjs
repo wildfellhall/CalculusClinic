@@ -3,6 +3,7 @@
 import {writeFile,mkdir,readFile,stat,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import assert from 'node:assert/strict';
+import {enterCourse} from './browser-course-setup.mjs';
 import {questions,BANK_VERSION} from '../data/questions.mjs';
 import {masteryFill} from '../src/graph.mjs';
 const targets=await (await fetch('http://127.0.0.1:9224/json/list')).json();
@@ -36,7 +37,7 @@ const answer=async(correct=true)=>{
 try{
   await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
-  await send('Page.navigate',{url:'http://127.0.0.1:3000'});await waitFor('!!document.querySelector(".explore-home")');
+  await send('Page.navigate',{url:'http://127.0.0.1:3000'});await enterCourse(run,waitFor);
   await run('localStorage.removeItem("calculus-clinic-progress-v1")');
   await send('Page.reload');await waitFor('!!document.querySelector(".explore-home")');
   await click('[data-view="practice"]');assert.deepEqual(await nextCheck(),{target:'1.2',kind:'start',anchor:''});
