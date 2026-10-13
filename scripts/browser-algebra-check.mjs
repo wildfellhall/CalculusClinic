@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {questions} from '../data/catalog.mjs';
-import {skipProgressCheck} from './browser-course-setup.mjs';
+import {skipProgressCheck,finishOnboardingWithoutCamera} from './browser-course-setup.mjs';
 import {PDFDocument} from 'pdf-lib';
 const appURL=process.env.QA_URL||'http://127.0.0.1:3000';
 const tabs=await (await fetch('http://127.0.0.1:9224/json/list')).json();
@@ -29,7 +29,7 @@ try{
  await send('Storage.clearDataForOrigin',{origin:appURL,storageTypes:'local_storage'});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA camera denied','NotAllowedError')};`});
  await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),4);await snap('algebra-onboarding');
- await click('[data-course="ALG1"]');await waitFor('!!document.querySelector(".explore-home")');assert.equal(await choice(),'ALG1');assert.match(await run('document.querySelector("h1").textContent'),/algebra/);await snap('algebra-home');
+ await click('[data-course="ALG1"]');await finishOnboardingWithoutCamera(run,waitFor);await waitFor('!!document.querySelector(".explore-home")');assert.equal(await choice(),'ALG1');assert.match(await run('document.querySelector("h1").textContent'),/algebra/);await snap('algebra-home');
  await click('[data-view="practice"]');assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');assert.equal(await run('document.querySelector("#practice-concept").options.length'),65);
  await click('[data-action="diagnostic"]');for(let i=0;i<3;i++)await answerNext(true);
  assert.equal((await stored()).length,3);await load();assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'continue');await click('[data-action="diagnostic"]');

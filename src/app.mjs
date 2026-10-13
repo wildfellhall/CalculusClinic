@@ -14,6 +14,8 @@ import {reportData} from './report-data.mjs';
 import {COURSES,courseTitle,courseIncludes,readCourse,saveCourse} from './course.mjs';
 import {createProgressCheck,validateProgressChecks,mergeProgressChecks,checkReady,progressCheckRows,PROGRESS_CHECK_COLUMNS} from './progress-checks.mjs';
 import {renderProgressCheck,renderCheckResponse,renderProgressCheckHistory} from './progress-check-ui.mjs';
+import {readOnboarding,saveOnboarding} from './onboarding.mjs';
+import {renderOnboarding as renderOnboardingScreen} from './onboarding-ui.mjs';
 
 const {concepts,relationships,questions,archivedQuestions=[],units,sources,standards,metadata}=window.CALCULUS_DATA;
 const attemptQuestions=[...questions,...archivedQuestions];
@@ -28,7 +30,7 @@ const qs=id=>questions.filter(q=>q.conceptId===id);
 const pct=value=>value===null?'—':Math.round(value*100)+'%';
 const browserStorage={getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)};
 const savedCourse=readCourse(browserStorage);
-const state={view:'atlas',tab:'browse',unit:'all',selected:savedCourse?.startsWith('ALG')?COURSES[savedCourse].entryId:'1.11',course:savedCourse||'BC',onboarding:!savedCourse,query:'',graphScope:'focus',graphMode:'accuracy',scoringPreferences:normalizeScoringPreferences(),connections:false,progressFilter:'started',quiz:null,attempts:[],progressChecks:[],progressCheckId:null,storageMessage:''};
+const state={view:'atlas',tab:'browse',unit:'all',selected:savedCourse?.startsWith('ALG')?COURSES[savedCourse].entryId:'1.11',course:savedCourse||'BC',onboarding:readOnboarding(browserStorage,savedCourse),onboardingWarning:'',query:'',graphScope:'focus',graphMode:'accuracy',scoringPreferences:normalizeScoringPreferences(),connections:false,progressFilter:'started',quiz:null,attempts:[],progressChecks:[],progressCheckId:null,storageMessage:''};
 try{
   const saved=localStorage.getItem(STORAGE_KEY);
   if(saved){const parsed=JSON.parse(saved);if(parsed.schemaVersion!==1)throw new Error('Unsupported storage version');const attempts=validateAttempts(parsed.attempts,attemptQuestions),checks=validateProgressChecks(parsed.progressChecks,attempts,concepts);state.attempts=attempts;state.progressChecks=checks;state.graphMode=normalizeGraphMode(parsed.graphMode);state.scoringPreferences=normalizeScoringPreferences(parsed.scoringPreferences);}
@@ -36,11 +38,11 @@ try{
 let readFailed=!!state.storageMessage;
 let dataRevision=0;
 let reportBusy=false;
-let autoCameraSession=null,pageActive=true;
+let autoCameraSession=null,onboardingBaseline=null,pageActive=true;
 const questionClock=new QuestionClock();
 const camera=new MovementCamera(()=>{syncQuestionClock();updateCameraUI();});
 const cameraAccess=new CameraAccess({storage:browserStorage,mediaDevices:navigator.mediaDevices,permissions:navigator.permissions,secure:isSecureContext,
-  onRevoke:()=>camera.stop(),onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
+  onRevoke:()=>{onboardingBaseline=null;camera.stop();},onChange:()=>{autoCameraSession=null;syncQuestionClock();updateCameraUI();updateCameraSettings();}});
 function updateQuestionTimer(){
   const el=document.querySelector('#question-timer'),label=document.querySelector('#timer-status');
   if(!el||!state.quiz)return;
@@ -49,6 +51,7 @@ function updateQuestionTimer(){
   label.textContent=state.quiz.answered?'Answered in':questionClock.running?'Active time':'Paused';
 }
 function syncQuestionClock(focused=document.hasFocus()){
+  if(state.onboarding){syncOnboardingCamera(focused);return;}
   const quiz=state.quiz,current=quiz?.list[quiz.index];
   const allowed=pageActive&&state.view==='practice'&&!state.progressCheckId&&!!current&&!document.hidden&&cameraAccess.canStart;
   const active=allowed&&!quiz.answered&&focused&&!state.progressCheckId;
@@ -58,7 +61,8 @@ function syncQuestionClock(focused=document.hasFocus()){
     // Try once per visible practice session. Model/device failures need an
     // explicit retry, rather than a loop of permission or camera requests.
     autoCameraSession=quiz.sessionId;
-    void camera.start().then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again in Settings.');});
+    const baseline=onboardingBaseline;onboardingBaseline=null;
+    void camera.start({baseline}).then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again in Settings.');});
   }
   const z=state.quiz,q=z?.list[z.index];
   if(!q)questionClock.reset();
@@ -71,6 +75,63 @@ function syncQuestionClock(focused=document.hasFocus()){
 function timingExplanation(){
   return `The timer counts active time on this question and pauses when you leave it or switch tabs/windows. There is no time limit. Correct answers get full credit through ${TIMING_POLICY.fullCreditMs/60000} minutes; from there to ${TIMING_POLICY.floorMs/60000} minutes, their mastery credit decreases gently to ${Math.round((1-TIMING_POLICY.weight)*100)}%. Time can change a concept’s mastery by at most ${Math.round(TIMING_POLICY.weight*100)} percentage points. Accuracy and the 8/10 pass rule do not change. Answers without recorded times keep full credit.`;
 }
+function saveOnboardingStep(step,outcome=null){
+  const saved=saveOnboarding(browserStorage,step,outcome);
+  state.onboardingWarning=saved?'':'Your setup applies to this visit only. This browser could not save it.';
+  return saved;
+}
+function setOnboardingStep(step){
+  if(!['course','tutorial','camera'].includes(step))return;
+  if(cameraAccess.pending)cameraAccess.cancelPending();
+  state.onboarding=step;autoCameraSession=null;saveOnboardingStep(step);render();
+  document.querySelector('#onboarding-title')?.focus({preventScroll:true});window.scrollTo(0,0);
+  if(step==='camera'&&!document.hidden)void cameraAccess.initialize();
+}
+function syncOnboardingCamera(focused){
+  questionClock.reset();
+  const allowed=state.onboarding==='camera'&&pageActive&&!document.hidden&&cameraAccess.canStart;
+  const active=allowed&&focused;
+  if(!allowed)autoCameraSession=null;
+  camera.sync({key:null,allowed,active});
+  if(active&&camera.stage==='off'&&autoCameraSession!=='onboarding'){
+    autoCameraSession='onboarding';
+    void camera.start().then(()=>{if(camera.permissionDenied)cameraAccess.revoke('Camera permission was removed. Enable it again when ready.');});
+  }
+}
+async function enableOnboardingCamera(){
+  if(state.onboarding!=='camera'||cameraAccess.pending)return;
+  if(!cameraAccess.initialized)await cameraAccess.initialize();
+  if(state.onboarding!=='camera')return;
+  if(!cameraAccess.canStart)await cameraAccess.request();
+  else{autoCameraSession=null;syncQuestionClock();updateOnboardingCameraUI();}
+}
+function updateOnboardingCameraUI(){
+  const status=document.querySelector('#onboarding-camera-state');if(!status)return;
+  const ready=camera.stage==='ready'&&!!camera.baseline,on=camera.stage!=='off';
+  const labels={off:'Camera off',loading:'Starting camera…',uncalibrated:'Ready to calibrate',calibrating:'Calibrating your resting face…',ready:'Calibration complete'};
+  const label=cameraAccess.pending?'Waiting for permission…':on&&!camera.active?'Camera paused':labels[camera.stage];
+  if(status.textContent!==label)status.textContent=label;
+  const message=ready?'You’re ready. Your camera will pause while you explore.':camera.message.replaceAll(' Timer paused.','')||cameraAccess.message||'Enable the camera to begin.';
+  const detail=document.querySelector('#onboarding-camera-message');if(detail.textContent!==message)detail.textContent=message;
+  document.querySelector('#onboarding-preview-host').hidden=!on;
+  document.querySelector('#onboarding-preview-placeholder').hidden=on;
+  const progress=document.querySelector('#onboarding-calibration-progress');progress.hidden=camera.stage!=='calibrating';progress.value=camera.progress;
+  document.querySelector('#onboarding-calibration-label').hidden=progress.hidden;
+  const enable=document.querySelector('#onboarding-camera-enable');enable.hidden=on;enable.disabled=cameraAccess.pending;
+  enable.textContent=cameraAccess.pending?'Waiting for permission…':camera.message||cameraAccess.message?'Try camera again':'Enable camera';
+  document.querySelector('#onboarding-recalibrate').hidden=!ready;
+  document.querySelector('#onboarding-finish').disabled=!ready||!cameraAccess.canStart;
+}
+function finishOnboarding(skipCamera){
+  if(state.onboarding!=='camera'||(!skipCamera&&(camera.stage!=='ready'||!camera.baseline||!cameraAccess.canStart)))return;
+  onboardingBaseline=skipCamera?null:structuredClone(camera.baseline);
+  state.onboarding=null;state.view='atlas';state.tab='browse';state.unit='all';state.query='';
+  const saved=saveOnboardingStep('complete',skipCamera?'skipped':'calibrated');
+  if(skipCamera)cameraAccess.revoke();
+  render();const heading=document.querySelector('.explore-home h1');heading.tabIndex=-1;heading.focus({preventScroll:true});window.scrollTo(0,0);
+  if(!saved)toast(state.onboardingWarning);
+  announce(skipCamera?'Setup complete. Camera is off.':'Setup complete. Your resting face is calibrated.');
+}
 function updateCheckInScore(){
   const el=document.querySelector('#checkin-score'),r=state.quiz?.checkIn;if(!el)return;
   const complete=r?.emotion&&r?.intensity&&r?.valence;
@@ -78,6 +139,7 @@ function updateCheckInScore(){
   el.hidden=!complete;
 }
 function updateCameraUI(){
+  updateOnboardingCameraUI();
   const el=document.querySelector('#camera-state');if(!el)return;
   const focused=document.activeElement;
   const on=camera.stage!=='off',answered=!!state.quiz?.answered,paused=on&&!camera.active;
@@ -216,28 +278,22 @@ function unitPicker(){
   return `<label class="unit-picker"><span class="sr-only">Browse a unit</span><select id="unit-filter"><option value="all" ${state.unit==='all'?'selected':''}>All units</option>${units.filter(u=>concepts.some(c=>eligible(c)&&c.unit===u.id)).map(u=>`<option value="${u.id}" ${state.unit===u.id?'selected':''}>${unitLabel(u.id)} · ${esc(u.title)}</option>`).join('')}</select></label>`;
 }
 function searchField(){return `<label class="search"><span class="sr-only">Search all concepts</span><input id="search" type="search" value="${esc(state.query)}" placeholder="Search concepts, skills, or topic numbers…" autocomplete="off"></label>`;}
-function renderOnboarding(){
-  return `<header class="site-header"><div class="topbar"><span class="brand"><span class="brand-mark" aria-hidden="true">∫</span><span>calculus clinic</span></span></div></header>
-    <main id="main" tabindex="-1"><section class="course-onboarding" aria-labelledby="onboarding-title"><h1 id="onboarding-title">Choose your learning path<span class="heading-dot" aria-hidden="true">.</span></h1><p class="course-intro">You can switch courses later. Your saved progress stays with you.</p><div class="course-options">${Object.entries(COURSES).map(([course,info])=>{
-      const count=concepts.filter(c=>courseIncludes(course,c)).length;
-      return `<button class="course-option course-option-${course.toLowerCase()}" data-action="choose-course" data-course="${course}" aria-label="Choose ${info.title}" aria-describedby="course-description-${course}"><span class="course-monogram" aria-hidden="true">${info.monogram}</span><span class="course-option-title">${info.title}</span><span class="course-description" id="course-description-${course}">${info.description}</span><span class="course-count">${count} concepts, including prerequisites</span><span class="course-begin">Choose ${info.shortTitle} <span aria-hidden="true">→</span></span></button>`;
-    }).join('')}</div></section></main>`;
-}
 function chooseCourse(course){
   if(!Object.hasOwn(COURSES,course))return;
   const firstChoice=state.onboarding;
-  state.course=course;state.onboarding=false;state.quiz=null;state.progressCheckId=null;
+  state.course=course;state.quiz=null;state.progressCheckId=null;
+  if(firstChoice){state.onboarding='tutorial';saveOnboardingStep('tutorial');}
   if(!eligible(byId.get(state.selected)))state.selected=COURSES[course].entryId;
   state.unit='all';state.query='';
   const saved=saveCourse(browserStorage,course);
   render();
-  if(firstChoice){const heading=document.querySelector('.explore-home h1');heading.tabIndex=-1;heading.focus({preventScroll:true});}
-  if(!saved)toast('Your course is selected for this visit. This browser could not save the choice.');
+  if(firstChoice)document.querySelector('#onboarding-title')?.focus({preventScroll:true});
+  if(!saved){state.onboardingWarning='Your course and setup apply to this visit only. This browser could not save the choice.';if(firstChoice)render();else toast(state.onboardingWarning);}
   announce(`${COURSES[course].title} selected.`);
-  if(!document.hidden)void cameraAccess.initialize();
+  if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();
 }
 function render(){
-  if(state.onboarding){document.querySelector('#app').innerHTML=renderOnboarding();return;}
+  if(state.onboarding){document.querySelector('#app').innerHTML=renderOnboardingScreen({step:state.onboarding,course:state.course,concepts,warning:state.onboardingWarning});camera.mount(document.querySelector('#onboarding-preview-host'));syncQuestionClock();updateOnboardingCameraUI();return;}
   refreshDiagnostic();
   const active=document.activeElement,focusId=active?.id,selection=active?.selectionStart;
   const c=byId.get(state.selected),overall=stats(state.attempts,questions.filter(q=>eligible(byId.get(q.conceptId))).map(q=>q.id));
@@ -340,6 +396,7 @@ function renderSettings(){
     <details class="settings-section"><summary>Check-ins & camera data</summary><p>Camera permission is requested on your first visit. Once allowed, camera use starts automatically in practice. You can revoke access above. Measurements run locally. Images, video, audio and the resting reference are never stored or uploaded. Only numeric summaries and voluntary emotion check-ins are saved with answers.</p><p>The camera stops when you leave practice or hide this tab. Each new camera session calibrates your resting face automatically. The question timer pauses during calibration; you can recalibrate at any time. Camera preferences belong to this browser and are not restored from practice backups. Check-ins work without a camera. Graph views can show an experimental camera-adjusted score, with facial movement as a separate border. Raw answer accuracy, passing and diagnostic recommendations do not change. Check-ins contribute to the combined view only when enabled above.</p>${observationMethod(state.scoringPreferences)}</details>
     <details class="settings-section"><summary>Progress & observation exports</summary><div class="download-list">${reportButton()}<button data-action="export-progress">Selected course · accuracy, mastery & observations <span>CSV ↓</span></button><button data-action="export-question-progress">Selected course · question accuracy <span>CSV ↓</span></button><button data-action="export-attempts">Every attempt <span>CSV ↓</span></button><button data-action="export-progress-checks">Selected course · progress checks <span>CSV ↓</span></button></div></details>
     <details class="settings-section"><summary>Curriculum downloads</summary><div class="download-list">${[['concepts.csv','Concepts','CSV'],['relationships.csv','Relationships','CSV'],['questions.csv','Questions & answers','CSV'],['ontology.json','Complete ontology','JSON'],['concept-map.svg','Complete concept graph','SVG'],['coverage.csv',state.course.startsWith('ALG')?'TEKS crosswalk & question evidence':'AP topic & question coverage','CSV'],['question-audit.csv','Question review by concept','CSV'],['archived-questions.json','Earlier question versions','JSON']].map(([file,label,type])=>`<a download href="/data/${state.course.toLowerCase()}/${file}">${label}<span>${type} ↓</span></a>`).join('')}</div></details>
+    <details class="settings-section"><summary>Getting started</summary><button class="button compact setup-replay" data-action="review-setup">Review the tour & camera setup</button></details>
     <section class="settings-section delete-section"><h2>Delete saved data</h2><p>Remove all practice history, progress checks, accuracy and mastery records, emotion check-ins, camera summaries, score preferences and the current practice set from this browser. Camera use will be turned off. Downloaded backups and data on other devices are kept.</p><button class="button danger" id="delete-data" data-action="delete-data">Delete my practice data</button></section>
     <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description"><h2 id="delete-title">Delete your practice data?</h2><p id="delete-description">All ${state.attempts.length} practice attempts, progress checks, accuracy records, emotion check-ins and camera summaries will be removed from this browser. Your current practice set will also end. This cannot be undone without an exported backup.</p><p id="delete-error" class="delete-error" role="alert" hidden></p><div class="button-row"><button class="button" data-action="cancel-delete" autofocus>Keep my data</button><button class="button danger" data-action="confirm-delete">Delete data</button></div></dialog>
   </section>`;
@@ -386,6 +443,12 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-action]');if(!el)return;const {action,id}=el.dataset;
   if(el.tagName==='A')e.preventDefault();
   if(action==='choose-course'){chooseCourse(el.dataset.course);return;}
+  if(action==='onboarding-back'){setOnboardingStep(el.dataset.step);return;}
+  if(action==='onboarding-camera'){setOnboardingStep('camera');return;}
+  if(action==='onboarding-enable-camera'){void enableOnboardingCamera();return;}
+  if(action==='onboarding-finish'){finishOnboarding(false);return;}
+  if(action==='onboarding-skip-camera'){finishOnboarding(true);return;}
+  if(action==='review-setup'){state.quiz=null;state.progressCheckId=null;onboardingBaseline=null;setOnboardingStep('tutorial');return;}
   if(action==='select')return selectConcept(id);
   if(action==='export-report'){void exportReport();return;}
   if(action==='graph-mode'){setGraphMode(el.dataset.mode);return;}
@@ -471,10 +534,10 @@ function renderStoredProgress(){
   render();
   if(viewport&&document.querySelector('#map-svg')){Object.assign(graphState,viewport);transformGraph();}
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!state.onboarding)void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
 window.addEventListener('blur',()=>{syncQuestionClock(false);updateCameraUI();});
 window.addEventListener('focus',()=>{syncQuestionClock();updateCameraUI();});
-window.addEventListener('pagehide',()=>{pageActive=false;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
+window.addEventListener('pagehide',()=>{pageActive=false;onboardingBaseline=null;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
 window.addEventListener('pageshow',()=>{pageActive=true;syncQuestionClock();});
 setInterval(updateQuestionTimer,250);
 window.addEventListener('storage',e=>{
@@ -489,4 +552,4 @@ window.addEventListener('storage',e=>{
   }catch{/* Retain the valid session if another tab writes invalid data. */}
 });
 render();
-if(!document.hidden&&!state.onboarding)void cameraAccess.initialize();
+if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();

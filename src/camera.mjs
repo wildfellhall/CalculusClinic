@@ -21,7 +21,7 @@ export class MovementCamera {
     if(!active){this.summary?.gap();this.expressionSummary?.gap();this.liveExpression=null;this.calibrationFrames=[];this.calibrationStart=null;}
     for(const track of this.stream?.getVideoTracks()||[])track.enabled=active;
   }
-  async start(){
+  async start({baseline=null}={}){
     if(this.stage!=='off'||!this.allowed)return;
     this.permissionDenied=false;
     if(!isSecureContext||!navigator.mediaDevices?.getUserMedia||!globalThis.Worker||!globalThis.createImageBitmap||!globalThis.OffscreenCanvas){this.message='Camera measurements need a supported browser on HTTPS or localhost. Practice and check-ins still work.';this.notify();return;}
@@ -44,7 +44,12 @@ export class MovementCamera {
         if(data.type==='ready'){
           if(this.stage!=='loading')return;
           clearTimeout(this.loadTimeout);this.stage='uncalibrated';this.message='';
-          this.interval=setInterval(()=>this.capture(),200);this.beginCalibration();return;
+          this.interval=setInterval(()=>this.capture(),200);
+          // First practice may use the reference just calibrated in onboarding.
+          // This handoff is in memory only; normal new sessions still calibrate.
+          if(baseline){this.baseline=structuredClone(baseline);this.stage='ready';this.progress=100;this.message='';this.notify();}
+          else this.beginCalibration();
+          return;
         }
         if(data.type==='sample'){
           this.inFlight=false;

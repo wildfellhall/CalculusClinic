@@ -70,3 +70,14 @@ test('Stopping discards the reference; reopening calibrates automatically and la
   samples(6000,10);const token=camera.token;camera.stop();
   workers[1].emit({type:'sample',token,at:8000,values:vector(.2),expressions});assert.equal(camera.stage,'off');assert.equal(camera.baseline,null);assert.equal(camera.finish(),null);assert.equal(tracks[1].readyState,'ended');
 }));
+
+test('Onboarding calibrates without question evidence and hands its in-memory reference to first practice',()=>withCamera(async({camera,workers,tracks,samples})=>{
+  camera.sync({key:null,active:true,allowed:true});await camera.start();workers[0].emit({type:'ready'});samples(0,30);
+  assert.equal(camera.stage,'ready');const baseline=structuredClone(camera.baseline);
+  samples(6000,8,.6);assert.equal(camera.finish(),null);assert.equal(camera.finishExpression(),null);
+  camera.stop();assert.equal(tracks[0].readyState,'ended');assert.equal(camera.baseline,null);
+  camera.sync({key:'first-question',active:true,allowed:true});await camera.start({baseline});workers[1].emit({type:'ready'});
+  assert.equal(camera.stage,'ready');assert.equal(camera.setup,false);assert.deepEqual(camera.baseline,baseline);assert.notEqual(camera.baseline,baseline);
+  samples(10000,3,.6);assert.equal(camera.finish().baselineId,baseline.id);
+  camera.stop();camera.sync({key:'later-session',active:true,allowed:true});await camera.start();workers[2].emit({type:'ready'});assert.equal(camera.stage,'calibrating');
+}));

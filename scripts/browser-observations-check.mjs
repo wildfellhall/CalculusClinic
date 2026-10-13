@@ -22,7 +22,8 @@ try{
   await send('Storage.clearDataForOrigin',{origin:qaURL,storageTypes:'local_storage'});
   await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();window.qaMediaCalls=0;window.qaStreams=[];window.qaNativeMedia=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async options=>{window.qaMediaCalls++;const s=await qaNativeMedia(options);window.qaStream=s;qaStreams.push(s);return s;};`});
   await loadPage('Page.navigate',{url:qaURL+'/'});
-  await waitFor('qaMediaCalls===1&&qaStreams.length===1&&qaStreams[0].getTracks().every(t=>t.readyState==="ended")');
+  await click('[data-view="settings"]');await click('#camera-settings-enable');
+  await waitFor('document.querySelector("#camera-access-state").textContent==="On during practice"&&qaStreams.length>0&&qaStreams.every(s=>s.getTracks().every(t=>t.readyState==="ended"))');
   assert.equal(await run('qaStream.getAudioTracks().length'),0,'First entry requests video only and releases the permission stream');
   await loadPage('Page.reload');
   await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});

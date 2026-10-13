@@ -240,6 +240,47 @@ button,select,input[type=search]{box-shadow:none}
 .topic-number{padding:0 8px;white-space:nowrap}
 .standard-list{padding-left:20px}.standard-list li{padding:5px 0}.standard-list a{color:var(--green)}
 
+.onboarding-main{padding:30px 24px 60px}
+.onboarding-main h1{outline:none}
+.onboarding-steps{display:flex;justify-content:center;gap:36px;max-width:760px;margin:0 auto 30px;padding:0;list-style:none;font-size:14px;color:var(--muted)}
+.onboarding-steps li{display:flex;align-items:center;gap:9px}
+.onboarding-steps li>span{display:grid;place-items:center;width:30px;height:30px;border:1px solid #cddccc;border-radius:10px;background:var(--paper);font-family:Fraunces,serif;font-size:16px}
+.onboarding-steps [aria-current]{color:var(--ink);font-weight:800}
+.onboarding-steps [aria-current]>span{background:var(--mint);border-color:#84b397}
+.onboarding-steps .step-done>span{background:#eef5e9}
+.onboarding-main .course-onboarding{padding:10px 8px 30px}
+.onboarding-card{position:relative;max-width:760px;margin:0 auto;padding:34px;border:1px solid #b8d3bf;border-radius:20px;background:var(--paper)}
+.onboarding-card::after{content:"";position:absolute;inset:7px;border:1px dashed #c5dccb;border-radius:13px;pointer-events:none}
+.onboarding-card>.eyebrow{display:block;margin-bottom:13px;color:var(--muted)}
+.onboarding-card h1{font-size:36px;line-height:1.25;margin-bottom:20px}
+.tutorial-lessons{list-style:none;padding:0;margin:25px 0 30px;display:grid;gap:12px}
+.tutorial-lessons li{display:flex;align-items:flex-start;gap:16px;padding:20px;border:1px solid #cde0d1;border-radius:14px;background:#f0fbf3}
+.tutorial-lessons li:nth-child(2){background:#f5f0fb;border-color:#dad0e7}
+.tutorial-lessons li:nth-child(3){background:#fff5e8;border-color:#e4d5bb}
+.tutorial-number{flex-shrink:0;display:grid;place-items:center;width:31px;height:31px;border:1px solid #c6d6c8;border-radius:10px;background:var(--paper);font-family:Fraunces,serif;font-size:19px}
+.tutorial-lessons h2{font-size:21px;margin-bottom:9px}
+.tutorial-lessons p{font-size:14px;line-height:1.65;color:var(--muted)}
+.onboarding-actions{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px}
+.onboarding-actions .text-link,.onboarding-skip{min-height:44px}
+.onboarding-intro{max-width:530px;color:var(--muted);font-size:15px;line-height:1.6}
+.onboarding-preview{max-width:360px;margin:24px auto 18px;aspect-ratio:4/3;border:1px solid #b8d1bf;border-radius:16px;overflow:hidden;background:#eff6ed}
+.onboarding-preview .camera-preview{max-width:none;border:0;border-radius:0}
+#onboarding-preview-placeholder{height:100%;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;font-size:13px;color:var(--muted)}
+#onboarding-preview-placeholder[hidden]{display:none}
+.resting-face-guide{display:block;width:72px;height:95px;border:1px dashed #8cb397;border-radius:48% 48% 45% 45%;background:#e4f4e6}
+.onboarding-camera-feedback{max-width:500px;margin:auto;text-align:center;font-size:14px;min-height:63px}
+.onboarding-camera-feedback>strong{font-weight:800}
+.onboarding-camera-feedback>p{color:var(--muted);margin:8px 0 12px;line-height:1.6}
+.onboarding-camera-feedback>label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.onboarding-camera-feedback>label[hidden]{display:none}
+#onboarding-calibration-progress{width:100%;max-width:360px;height:10px;accent-color:#649577}
+.onboarding-camera-controls{display:flex;justify-content:center;gap:14px;margin:15px 0}
+.onboarding-privacy{max-width:520px;margin:20px auto 0;text-align:center;font-size:12px;color:var(--muted);line-height:1.6}
+.onboarding-skip{display:block;margin:16px auto 0;font-size:13px}
+.onboarding-warning{max-width:760px;margin:0 auto 20px;padding:14px;border:1px solid #e0cdb0;border-radius:12px;background:#fff3df;font-size:14px}
+.setup-replay{margin-top:18px}
+@media(max-width:520px){.onboarding-main{padding:24px 16px 40px}.onboarding-steps{gap:18px;font-size:12px;margin-bottom:24px}.onboarding-steps li{gap:6px}.onboarding-steps li>span{width:26px;height:26px;font-size:14px}.onboarding-main .course-onboarding{padding:0}.onboarding-card{padding:27px 20px}.onboarding-card h1{font-size:29px}.tutorial-lessons{gap:12px}.tutorial-lessons li{padding:16px 12px;gap:10px}.tutorial-lessons h2{font-size:19px}.tutorial-lessons p{font-size:13px}.tutorial-number{width:25px;height:25px;font-size:16px}.onboarding-actions{flex-wrap:wrap;gap:12px}.onboarding-actions .button{font-size:13px}.onboarding-actions .text-link{font-size:13px}.onboarding-intro{font-size:14px}.onboarding-camera-feedback{font-size:13px}.onboarding-preview{margin-top:20px}.onboarding-privacy{font-size:12px}.onboarding-steps li{white-space:nowrap}}
+
 /* End-of-set reflection: the same stitched paper border as practice cards. */
 .progress-check{position:relative;max-width:760px;margin:0 auto;border:1px solid #aecfb9;border-radius:20px;background:var(--paper);padding:32px}
 .progress-check::after{content:"";position:absolute;inset:7px;border:1px dashed #c5dccb;border-radius:13px;pointer-events:none}

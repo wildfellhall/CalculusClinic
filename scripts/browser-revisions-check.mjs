@@ -1,3 +1,4 @@
+import {finishOnboardingWithoutCamera} from './browser-course-setup.mjs';
 // Isolated local QA with fabricated historical answers and denied camera access.
 import assert from 'node:assert/strict';
 import {writeFile,mkdir} from 'node:fs/promises';
@@ -21,7 +22,7 @@ try{
  await send('Runtime.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,deviceScaleFactor:1,mobile:false});
  await send('Storage.clearDataForOrigin',{origin:appURL,storageTypes:'local_storage'});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA denied','NotAllowedError')};`});
- await load('Page.navigate',{url:appURL});await click('[data-course="ALG1"]');await waitFor('!!document.querySelector(".explore-home")');
+ await load('Page.navigate',{url:appURL});await click('[data-course="ALG1"]');await finishOnboardingWithoutCamera(run,waitFor);await waitFor('!!document.querySelector(".explore-home")');
  await run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({schemaVersion:1,attempts:${JSON.stringify(fixture)}}))`);await load();
  assert.deepEqual(await stored(),fixture);assert.equal(await run('document.body.innerText.includes("Saved progress could not be read")'),false);
  await click('[data-view="graph"]');await change('#graph-concept','MATH_028');assert.deepEqual(await graphNode('MATH_028'),{status:'unseen',score:'unscored'});

@@ -1,3 +1,4 @@
+import {finishOnboardingWithoutCamera} from './browser-course-setup.mjs';
 // Local browser QA in an isolated Chrome profile on port 9224; no real camera.
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -34,7 +35,7 @@ const importData=async(data,name='survey-backup')=>{
 try{
  await mkdir('test-results',{recursive:true});await send('Page.enable');await send('Runtime.enable');
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();window.qaCameraRequests=0;navigator.mediaDevices.getUserMedia=async()=>{qaCameraRequests++;throw new DOMException('QA denied','NotAllowedError')};`});
- await size(1440);await load('Page.navigate',{url:appURL});await click('[data-course="ALG1"]');
+ await size(1440);await load('Page.navigate',{url:appURL});await click('[data-course="ALG1"]');await finishOnboardingWithoutCamera(run,waitFor);
  await start('MATH_034');for(let i=0;i<9;i++)await answer(i<8);
  assert.equal(await run('!!document.querySelector("#progress-check-form")'),false);assert.equal((await stored()).progressChecks.length,0);
  await answer(false);await waitFor('!!document.querySelector("#progress-check-form")');
