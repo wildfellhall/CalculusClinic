@@ -18,7 +18,7 @@ metadata.coverageScope=COVERAGE_SCOPE;
 metadata.revisedQuestionCount=archivedQuestions.length;
 metadata.historyPolicy='Replaced questions have new IDs. Earlier attempts remain available in history and backups; current accuracy and diagnostic passing use current questions only. Node camera observations retain their original history.';
 const bundle={metadata,courses:COURSES,units,concepts,relationships,questions,archivedQuestions,sources,standards};
-await writeFile('dist/data/bundle.js','window.CALCULUS_DATA='+JSON.stringify({...bundle,mathText:compileMathText(concepts,questions)}).replaceAll('<','\\u003c')+';\n');
+await writeFile('dist/data/bundle.js','window.CALCULUS_DATA='+JSON.stringify({...bundle,mathText:compileMathText(concepts,[...questions,...archivedQuestions])}).replaceAll('<','\\u003c')+';\n');
 async function exportCurriculum(path,nodes,items,edges,course=null){
  await mkdir(path,{recursive:true});
  nodes=nodes.map(c=>({...c,prerequisites:edges.filter(e=>e.type==='prerequisite'&&e.target===c.id).map(e=>e.source)}));
@@ -43,7 +43,7 @@ for(const course of Object.keys(COURSES)){
  const nodes=courseConcepts(course,concepts,relationships),ids=new Set(nodes.map(c=>c.id));
  await exportCurriculum('dist/data/'+course.toLowerCase(),nodes,questions.filter(q=>ids.has(q.conceptId)),relationships.filter(e=>relationshipInCourse(course,e)&&ids.has(e.source)&&ids.has(e.target)),course);
 }
-for(const file of ['app.mjs','practice-notes.mjs','practice-tools.mjs','desmos-tool.mjs','embedded-calculator.mjs','scratch-pad.mjs','scratch-data.mjs','onboarding.mjs','onboarding-ui.mjs','progress-checks.mjs','progress-check-ui.mjs','core.mjs','course.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
+for(const file of ['app.mjs','practice-notes.mjs','practice-tools.mjs','desmos-tool.mjs','embedded-calculator.mjs','scratch-pad.mjs','scratch-data.mjs','scratch-render.mjs','concept-report-data.mjs','concept-report-pdf.mjs','report-math-images.mjs','onboarding.mjs','onboarding-ui.mjs','progress-checks.mjs','progress-check-ui.mjs','core.mjs','course.mjs','graph.mjs','graph-views.mjs','score-policy.mjs','report-data.mjs','report-pdf.mjs','diagnostic.mjs','timing.mjs','math.mjs','observations.mjs','camera.mjs','camera-access.mjs','face-worker.mjs','observation-ui.mjs'])await cp('src/'+file,'dist/src/'+file);
 for(const file of ['index.html','styles.css'])await cp('src/'+file,'dist/'+file);
 await cp('public','dist',{recursive:true});
 await mkdir('dist/vendor/katex',{recursive:true});

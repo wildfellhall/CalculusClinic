@@ -146,7 +146,9 @@ export async function renderReportPDF(report,units,{PDFLib,fontkit,fonts}){
 }
 
 let resources;
-export async function createReportPDF(report,units){
+export async function reportResources(){
   resources??=Promise.all([import('/vendor/pdf/pdf-lib.min.js'),import('/vendor/pdf/fontkit.umd.min.js'),...['nunito','nunito-bold','fraunces'].map(async name=>{const r=await fetch(`/fonts/${name}.ttf`);if(!r.ok)throw new Error('Report fonts could not be loaded.');return r.arrayBuffer();})]).then(([, ,...fonts])=>({PDFLib:globalThis.PDFLib,fontkit:globalThis.fontkit,fonts})).catch(error=>{resources=null;throw error;});
-  return renderReportPDF(report,units,await resources);
+  return resources;
 }
+
+export async function createReportPDF(report,units){return renderReportPDF(report,units,await reportResources());}

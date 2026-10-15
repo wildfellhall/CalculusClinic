@@ -1,3 +1,4 @@
+import {renderScratch} from './scratch-render.mjs';
 import {ScratchData,SCRATCH_PREFIX,PAPER,INKS,MAX_POINTS,MAX_STROKES} from './scratch-data.mjs';
 
 export class ScratchPad {
@@ -49,23 +50,7 @@ export class ScratchPad {
     if(this.canvas?.hasPointerCapture(id))this.canvas.releasePointerCapture(id);
     this.paint();this.update();
   }
-  draw(context,strokes){
-    context.lineCap='round';context.lineJoin='round';
-    for(const s of strokes){
-      context.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';context.strokeStyle=s.color;context.fillStyle=s.color;context.lineWidth=s.width;
-      if(s.points.length===1){context.beginPath();context.arc(...s.points[0],s.width/2,0,Math.PI*2);context.fill();}
-      else{context.beginPath();s.points.forEach((p,i)=>i?context.lineTo(...p):context.moveTo(...p));context.stroke();}
-    }
-    context.globalCompositeOperation='source-over';
-  }
-  render(canvas,width,height,dpr=1){
-    canvas.width=Math.max(1,Math.round(width*dpr));canvas.height=Math.max(1,Math.round(height*dpr));
-    const ctx=canvas.getContext('2d'),scale=Math.min(canvas.width/PAPER.width,canvas.height/PAPER.height);
-    ctx.fillStyle='#fffef9';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.translate((canvas.width-PAPER.width*scale)/2,(canvas.height-PAPER.height*scale)/2);ctx.scale(scale,scale);
-    ctx.fillStyle='#d7e2d4';for(let x=20;x<PAPER.width;x+=40)for(let y=20;y<PAPER.height;y+=40){ctx.beginPath();ctx.arc(x,y,1.3,0,Math.PI*2);ctx.fill();}
-    const ink=document.createElement('canvas');ink.width=Math.ceil(PAPER.width*scale);ink.height=Math.ceil(PAPER.height*scale);const ic=ink.getContext('2d');ic.scale(scale,scale);
-    this.draw(ic,[...this.data.page(this.id).strokes,...(this.stroke?[this.stroke]:[])]);ctx.drawImage(ink,0,0,PAPER.width,PAPER.height);
-  }
+  render(canvas,width,height,dpr=1){renderScratch(canvas,[...this.data.page(this.id).strokes,...(this.stroke?[this.stroke]:[])],width,height,dpr);}
   paint(){
     if(!this.canvas?.isConnected)return;
     const host=this.canvas.parentElement,scale=Math.min(host.clientWidth/PAPER.width,host.clientHeight/PAPER.height);
