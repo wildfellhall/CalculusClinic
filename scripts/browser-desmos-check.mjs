@@ -20,7 +20,7 @@ try{
  await click('[data-view="practice"]');await click('[data-action="start-picked"]');
  assert.equal(await run('!!document.querySelector("#desmos-frame")'),false);assert.equal(requests.some(url=>url.includes('desmos.com')),false,'Desmos must not load until requested');
  await click('.answer-options input');const choice=await run('document.querySelector(".answer-options input:checked").value');await click('#open-desmos');
- await waitFor('!!document.querySelector("#desmos-frame")&&document.querySelector(".desmos-loading").hidden');
+ await waitFor('!!document.querySelector("#desmos-frame")&&document.querySelector("#desmos-panel .embedded-loading").hidden');
  let target;
  for(let i=0;i<100;i++){target=(await send('Target.getTargets')).targetInfos.find(t=>t.type==='iframe'&&t.url.startsWith('https://www.desmos.com/calculator'));if(target)break;await new Promise(r=>setTimeout(r,100));}
  assert.ok(target,'The real Desmos frame loads');
