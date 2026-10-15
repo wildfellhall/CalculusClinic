@@ -381,3 +381,29 @@ button,select,input[type=search]{box-shadow:none}
  .practice-tool-launcher .button{min-height:44px}
 }
 @media print{.practice-tool-launcher,.practice-tools{display:none!important}.practice-workspace.has-tools{display:block}.practice-page.with-tools{padding-bottom:0}}
+
+/* A persistent Desmos frame keeps graphs intact when question markup changes. */
+.practice-tool-launcher{flex-wrap:wrap}
+.practice-page.with-desmos{max-width:1400px}
+.practice-workspace.has-desmos{grid-template-columns:minmax(0,1fr) minmax(520px,620px)}
+.practice-tools.desmos-slot{visibility:hidden;height:640px;pointer-events:none}
+.desmos-panel{position:fixed;z-index:20;display:flex;flex-direction:column;min-width:0;border:1px solid #aecdb9;border-radius:18px;padding:16px;background:#f0fcf4;outline:1px dashed #c3dacb;outline-offset:-6px}
+.desmos-panel .practice-tool-heading{flex-shrink:0;margin-bottom:10px}
+.desmos-actions{display:flex;align-items:center;gap:16px;font-size:12px}
+.desmos-actions a{white-space:nowrap}
+.desmos-frame-wrap{position:relative;flex:1;min-height:0;overflow:hidden;border:1px solid #bdd5c6;border-radius:10px;background:#fff}
+#desmos-frame{display:block;width:100%;height:100%;border:0}
+#desmos-frame:focus-visible{outline:2px solid #548e72;outline-offset:-2px}
+.desmos-loading{position:absolute;z-index:1;inset:0;display:grid;place-content:center;padding:25px;background:#fffefa;font-size:14px;line-height:1.7;pointer-events:none}
+.desmos-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;min-height:20px;font-size:11px;color:var(--muted);flex-shrink:0}
+.desmos-footer button{font-size:11px}
+@media(max-width:1100px){
+ .practice-page.with-desmos{max-width:850px;padding-bottom:calc(62dvh + 24px)}
+ .practice-workspace.has-desmos{grid-template-columns:minmax(0,1fr)}
+ .practice-tools.desmos-slot{display:none}
+ .desmos-panel{left:12px;right:12px;bottom:12px;margin:auto;max-width:640px;height:60dvh;max-height:620px;padding:12px}
+ .desmos-panel .practice-tool-heading{position:static;margin-top:0;padding-top:0}
+ .desmos-panel .practice-tool-heading h2{font-size:22px}
+ .desmos-footer{font-size:10px;margin-top:8px}
+}
+@media print{.desmos-panel{display:none!important}.practice-workspace.has-desmos{display:block}.practice-page.with-desmos{padding-bottom:0}}

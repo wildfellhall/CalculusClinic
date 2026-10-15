@@ -1,10 +1,14 @@
 import {calculate,formatResult,EXPRESSION_LIMIT} from './calculator.mjs';
 import {PracticeNotes,NOTES_KEY,NOTE_LIMIT} from './practice-notes.mjs';
 import {escapeHTML as esc} from './graph.mjs';
+import {DesmosTool} from './desmos-tool.mjs';
+
+const toolLabels={calculator:'Calculator',desmos:'Desmos',notepad:'Notepad'};
 
 export class PracticeTools {
   constructor(storage,conceptIds){
     this.notes=new PracticeNotes(storage,conceptIds);this.active=null;this.conceptId=null;this.expression='';this.angle='rad';this.answer=null;this.result=null;this.error='';this.undoNote=null;
+    this.desmos=new DesmosTool();
     document.addEventListener('click',e=>this.click(e));
     document.addEventListener('input',e=>{
       if(e.target.id==='calculator-expression'){this.expression=e.target.value;this.result=null;this.error='';this.updateResult();}
@@ -15,20 +19,20 @@ export class PracticeTools {
     });
     document.addEventListener('submit',e=>{if(e.target.id==='calculator-form'){e.preventDefault();this.evaluate();}});
     document.addEventListener('keydown',e=>{
-      if(e.key==='Escape'&&e.target.closest('#practice-tools-root')){e.preventDefault();this.close();}
+      if(e.key==='Escape'&&e.target.closest('#practice-tools-root, #desmos-panel')){e.preventDefault();this.close();}
     });
     window.addEventListener('storage',e=>{
       if(e.key===NOTES_KEY||e.key===null){this.notes.load();this.undoNote=null;const input=document.querySelector('#practice-notepad');if(input)input.value=this.notes.get(this.conceptId);this.updateNoteStatus();}
     });
   }
-  toolbar(){return `<div class="practice-tool-launcher" aria-label="Practice tools">${['calculator','notepad'].map(tool=>`<button type="button" id="open-${tool}" class="button compact" data-tool-action="toggle" data-tool="${tool}" aria-expanded="${this.active===tool}" aria-controls="practice-tools-root">${tool==='calculator'?'Calculator':'Notepad'}</button>`).join('')}</div>`;}
+  toolbar(){return `<div class="practice-tool-launcher" aria-label="Practice tools">${Object.entries(toolLabels).map(([tool,label])=>`<button type="button" id="open-${tool}" class="button compact" data-tool-action="toggle" data-tool="${tool}" aria-expanded="${this.active===tool}" aria-controls="${tool==='desmos'?'desmos-panel':'practice-tools-root'}">${label}</button>`).join('')}</div>`;}
   markup(conceptId){
     if(this.conceptId!==conceptId){this.conceptId=conceptId;this.undoNote=null;}
     return `<aside id="practice-tools-root" class="practice-tools" aria-label="Practice tools" ${this.active?'':'hidden'}>${this.panel()}</aside>`;
   }
   panel(){
-    if(!this.active)return '';
-    const header=`<div class="practice-tool-heading"><h2 id="practice-tool-title">${this.active==='calculator'?'Calculator':'Notepad'}</h2><button type="button" class="text-link" data-tool-action="close" aria-label="Close ${this.active}">Close</button></div>`;
+    if(!this.active||this.active==='desmos')return '';
+    const header=`<div class="practice-tool-heading"><h2 id="practice-tool-title">${toolLabels[this.active]}</h2><button type="button" class="text-link" data-tool-action="close" aria-label="Close ${this.active}">Close</button></div>`;
     return header+(this.active==='calculator'?this.calculator():this.notepad());
   }
   calculator(){
@@ -53,15 +57,19 @@ export class PracticeTools {
     const root=document.querySelector('#practice-tools-root');
     document.querySelector('.practice-page')?.classList.toggle('with-tools',!!root&&!!this.active);
     document.querySelector('.practice-workspace')?.classList.toggle('has-tools',!!this.active);
+    document.querySelector('.practice-page')?.classList.toggle('with-desmos',!!root&&this.active==='desmos');
+    document.querySelector('.practice-workspace')?.classList.toggle('has-desmos',this.active==='desmos');
+    root?.classList.toggle('desmos-slot',this.active==='desmos');
+    this.desmos.mount(root,!!root&&this.active==='desmos');
   }
   refresh(focus=false){
     const root=document.querySelector('#practice-tools-root');if(!root)return;
     root.hidden=!this.active;root.innerHTML=this.panel();this.mount();
-    for(const tool of ['calculator','notepad'])document.querySelector('#open-'+tool)?.setAttribute('aria-expanded',String(this.active===tool));
+    for(const tool of Object.keys(toolLabels))document.querySelector('#open-'+tool)?.setAttribute('aria-expanded',String(this.active===tool));
     if(focus){
-      document.querySelector(this.active==='calculator'?'#calculator-expression':'#practice-notepad')?.focus({preventScroll:true});
+      document.querySelector(this.active==='desmos'?'#desmos-frame':this.active==='calculator'?'#calculator-expression':'#practice-notepad')?.focus({preventScroll:true});
       // Leave the problem in view above the compact tool drawer on phones.
-      if(window.matchMedia('(max-width:950px)').matches)document.querySelector('#question-title')?.scrollIntoView({block:'start'});
+      if(window.matchMedia(`(max-width:${this.active==='desmos'?1100:950}px)`).matches)document.querySelector('#question-title')?.scrollIntoView({block:'start'});
     }
   }
   close(){const previous=this.active;this.active=null;this.refresh();document.querySelector('#open-'+previous)?.focus({preventScroll:true});}
@@ -87,6 +95,7 @@ export class PracticeTools {
     const action=button.dataset.toolAction;
     if(action==='toggle'){if(this.active===button.dataset.tool)this.close();else{this.active=button.dataset.tool;this.refresh(true);}return;}
     if(action==='close'){this.close();return;}
+    if(action==='retry-desmos'){this.desmos.load();return;}
     if(action==='insert'){this.insert(button.dataset.value);return;}
     if(action==='backspace'){this.insert('',{backspace:true});return;}
     if(action==='clear-calculator'){this.expression='';this.result=null;this.answer=null;this.error='';this.refresh(true);return;}
@@ -101,5 +110,5 @@ export class PracticeTools {
       this.notes.set(this.conceptId,next);this.undoNote=null;this.active='notepad';this.refresh(true);
     }
   }
-  clear(){this.notes.clear();this.active=null;this.expression='';this.result=null;this.answer=null;this.error='';this.undoNote=null;}
+  clear(){this.notes.clear();this.desmos.clear();this.active=null;this.expression='';this.result=null;this.answer=null;this.error='';this.undoNote=null;}
 }

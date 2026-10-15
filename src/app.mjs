@@ -297,7 +297,7 @@ function chooseCourse(course){
   if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();
 }
 function render(){
-  if(state.onboarding){document.querySelector('#app').innerHTML=renderOnboardingScreen({step:state.onboarding,course:state.course,concepts,warning:state.onboardingWarning});camera.mount(document.querySelector('#onboarding-preview-host'));syncQuestionClock();updateOnboardingCameraUI();return;}
+  if(state.onboarding){document.querySelector('#app').innerHTML=renderOnboardingScreen({step:state.onboarding,course:state.course,concepts,warning:state.onboardingWarning});practiceTools.mount();camera.mount(document.querySelector('#onboarding-preview-host'));syncQuestionClock();updateOnboardingCameraUI();return;}
   refreshDiagnostic();
   const active=document.activeElement,focusId=active?.id,selection=active?.selectionStart;
   const c=byId.get(state.selected),overall=stats(state.attempts,questions.filter(q=>eligible(byId.get(q.conceptId))).map(q=>q.id));
@@ -540,7 +540,9 @@ function renderStoredProgress(){
   if(viewport&&document.querySelector('#map-svg')){Object.assign(graphState,viewport);transformGraph();}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&(!state.onboarding||state.onboarding==='camera'))void cameraAccess.initialize();syncQuestionClock();updateCameraUI();});
-window.addEventListener('blur',()=>{syncQuestionClock(false);updateCameraUI();});
+// Focusing the embedded calculator blurs the parent window but keeps the page
+// focused. Wait for focus to settle before deciding whether practice is paused.
+window.addEventListener('blur',()=>{setTimeout(()=>{syncQuestionClock();updateCameraUI();},0);});
 window.addEventListener('focus',()=>{syncQuestionClock();updateCameraUI();});
 window.addEventListener('pagehide',()=>{pageActive=false;cameraAccess.cancelPending();camera.stop();questionClock.setRunning(false);});
 window.addEventListener('pageshow',()=>{pageActive=true;syncQuestionClock();});
