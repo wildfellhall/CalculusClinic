@@ -36,7 +36,15 @@ export function conceptReportData({conceptId,concepts,relationships,questions,ar
   });
   const ids=new Map(concepts.map(c=>[c.id,c]));
   const connections=relationships.filter(e=>e.type==='prerequisite'&&relationshipInCourse(course,e)&&courseIncludes(course,ids.get(e.source))&&courseIncludes(course,ids.get(e.target))&&(e.source===conceptId||e.target===conceptId)).map(e=>({direction:e.target===conceptId?'Prerequisite':'Builds toward',concept:ids.get(e.target===conceptId?e.source:e.target)}));
-  return structuredClone({version:1,generatedAt,course,preferences:overall.preferences,policyVersion:overall.policyVersion,concept:row.concept,row,items,history,sessions,timing:timingSummary(history),observations:observationStats(history,conceptId),connections,
+  // Follow the graph's course-scoped prerequisite lists. Breadth-first traversal
+  // keeps the nearest distance and includes shared ancestors only once.
+  const rows=new Map(overall.rows.map(r=>[r.concept.id,r])),depths=new Map([[conceptId,0]]),queue=[conceptId];
+  for(let i=0;i<queue.length;i++)for(const id of rows.get(queue[i]).concept.prerequisites){
+    if(!rows.has(id)||depths.has(id))continue;
+    depths.set(id,depths.get(queue[i])+1);queue.push(id);
+  }
+  const prerequisites=queue.slice(1).map(id=>({...rows.get(id),depth:depths.get(id),observations:observationStats(attempts,id)})).sort((a,b)=>a.depth-b.depth||a.concept.id.localeCompare(b.concept.id,undefined,{numeric:true}));
+  return structuredClone({version:1,generatedAt,course,preferences:overall.preferences,policyVersion:overall.policyVersion,concept:row.concept,row,items,history,sessions,timing:timingSummary(history),observations:observationStats(history,conceptId),connections,prerequisites,
     archivedAttemptCount:history.filter(a=>!currentKeys.has(a.questionId+'|'+a.bankVersion)).length,
     progressChecks:progressChecks.filter(c=>c.conceptId===conceptId).sort((a,b)=>a.completedAt.localeCompare(b.completedAt)),scratch,notes});
 }

@@ -40,15 +40,18 @@ export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images
     for(const l of wrap(value,CW,size,font)){ensure(size*1.45);text(l,M,y,size,font,ink);y+=size*1.45;}y+=gap;
   }
   function heading(value,reserve=60){ensure(30+reserve);paragraph(value,{size:14,font:display,gap:7});}
-  function table(headers,widths,rows,size=9){
+  function table(headers,widths,rows,size=9,{keepRows=false}={}){
+    const padding=keepRows?10:12;
     const header=()=>{ensure(42);box(M,y,CW,25,C.mint);let x=M;headers.forEach((h,i)=>{text(h,x+6,y+7,8,bold);x+=widths[i];});y+=25;};header();
     for(const cells of rows){
       const all=cells.map((c,i)=>wrap(c,widths[i]-12,size));let offset=0,total=Math.max(...all.map(ls=>ls.length));
+      const height=total*size*1.4+padding;
+      if(keepRows&&y+height>bottom&&height<bottom-120){addPage(section,true);header();}
       while(offset<total){
-        if(y+size*1.4+12>bottom){addPage(section,true);header();}
-        const count=Math.min(total-offset,Math.floor((bottom-y-12)/(size*1.4)));let x=M;
-        all.forEach((ls,i)=>{ls.slice(offset,offset+count).forEach((l,j)=>text(l,x+6,y+6+j*size*1.4,size));x+=widths[i];});
-        y+=count*size*1.4+12;line(y);offset+=count;
+        if(y+size*1.4+padding>bottom){addPage(section,true);header();}
+        const count=Math.min(total-offset,Math.floor((bottom-y-padding)/(size*1.4)));let x=M;
+        all.forEach((ls,i)=>{ls.slice(offset,offset+count).forEach((l,j)=>text(l,x+6,y+padding/2+j*size*1.4,size));x+=widths[i];});
+        y+=count*size*1.4+padding;line(y);offset+=count;
       }
     }y+=12;
   }
@@ -71,6 +74,19 @@ export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images
   table(['Total active time','Average','Median'],[CW/3,CW/3,CW/3],[[duration(t.total),duration(t.average),duration(t.median)]]);
   paragraph(`Correct-answer average: ${duration(t.correctAverage)}. Incorrect-answer average: ${duration(t.incorrectAverage)}. Fastest: ${duration(t.fastest)}. Slowest: ${duration(t.slowest)}.`,{size:9});
   paragraph(`Accuracy and passing use current questions only. Graph accuracy includes unanswered questions in its denominator. Timing can reduce practice mastery by at most 3 percentage points; it does not alter answer correctness. Combined scores use your saved preference: check-ins ${report.preferences.includeSelfReports?'included':'excluded'}.`,{size:9,ink:C.muted});
+
+  if(report.prerequisites.length){
+    addPage('Prerequisite overview');
+    paragraph(`${report.prerequisites.length} prerequisite skills in ${courseTitle(report.course)}, including earlier foundations. Closest skills come first; shared prerequisites appear once. Scores match each skill's graph display and do not change this concept's score.`,{size:9,ink:C.muted});
+    paragraph('Accuracy uses latest correct answers out of all current questions. Camera scores and expression labels are experimental estimates; percentages beside labels are mean model probabilities. Movement change is measured against the resting baseline. Camera and self-reported sentiment range from -100 to +100 and are shown separately.',{size:9,ink:C.muted});
+    table(['Prerequisite skill','Accuracy','Emotion overview'],[185,115,CW-300],report.prerequisites.map(p=>{
+      const e=p.expression,o=p.observations;
+      const emotion=e?`Camera score: ${score(p.emotions)}\n${e.label} (${number(e.confidence*100)}%)\nCamera sentiment: ${number(e.sentimentScore)}\n${e.records} ${e.records===1?'attempt':'attempts'}; ${e.samples} samples`:'Camera: not recorded';
+      const movement=p.change===null?'Movement: not recorded':`Movement change: ${number(p.change)} / 100`;
+      const checkIn=o.checkIns?`Self-report sentiment: ${number(o.sentimentScore)} (${o.checkIns} ${o.checkIns===1?'check-in':'check-ins'})`:'Self-report: not recorded';
+      return [`${p.concept.id}  ${p.concept.title}\n${p.depth===1?'Direct prerequisite':p.depth+' steps before this skill'}`,`${score(p.accuracy)}\n${p.latestCorrect}/${p.available} correct; ${p.attempted} tried\n${DIAGNOSTIC_LABELS[p.status]}`,`${emotion}\n${movement}\n${checkIn}`];
+    }),8.5,{keepRows:true});
+  }
 
   addPage('Emotions & facial movement');
   paragraph('Camera labels are experimental expression estimates, not direct measurements of felt emotion or understanding. They are recorded separately from self-reports. Missing evidence stays unrecorded.',{size:9,ink:C.muted});

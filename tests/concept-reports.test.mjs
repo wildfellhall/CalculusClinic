@@ -4,6 +4,7 @@ import {concepts,relationships,questions,archivedQuestions} from '../data/catalo
 import {conceptReportData} from '../src/concept-report-data.mjs';
 import {ExpressionSummary,EXPRESSION_LABELS} from '../src/expressions.mjs';
 import {selfReport} from '../src/observations.mjs';
+import {conceptReportFixture} from '../scripts/concept-report-fixture.mjs';
 const qs=questions.filter(q=>q.conceptId==='1.6'),old=archivedQuestions.find(q=>q.conceptId==='1.6');
 const attempt=(q,n,correct=true,durationMs=90000)=>({id:'try-'+n,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:correct?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct,answeredAt:new Date(Date.UTC(2026,9,14,0,n)).toISOString(),sessionId:n<10?'first':'retry',...(durationMs===null?{}:{durationMs})});
 const report=(attempts,extra={})=>conceptReportData({conceptId:'1.6',concepts,relationships,questions,archivedQuestions,attempts,...extra});
@@ -33,4 +34,32 @@ test('Per-node reports work for Algebra and shared subset foundations and reject
  const r=conceptReportData({conceptId:algebra.id,concepts,relationships,questions,archivedQuestions,attempts:[],course:'ALG1'});assert.equal(r.items.length,10);assert.equal(r.row.accuracy,null);
  assert.throws(()=>conceptReportData({conceptId:'9.1',concepts,relationships,questions,attempts:[],course:'AB'}));
  const shared=report([],{course:'CALC_SUBSET'});assert.equal(shared.concept.id,'1.6');assert.ok(shared.connections.some(e=>e.concept.curriculum==='algebra'));
+});
+test('Prerequisite overview follows the selected course through all ancestors, deduplicates shared paths and excludes dependents',()=>{
+ const r=report([]),parents=r.prerequisites;
+ assert.deepEqual(parents.map(p=>[p.concept.id,p.depth]),[['1.5',1],['F02',1],['1.2',2],['F01',2],['F04',3],['F05',3],['F03',4]]);
+ assert.ok(parents.every(p=>p.accuracy===null&&p.emotions===null&&p.change===null&&p.observations.checkIns===0));
+ const subset=report([],{course:'CALC_SUBSET'}).prerequisites;
+ assert.equal(subset.length,14);assert.ok(subset.some(p=>p.concept.id==='MATH_057'&&p.depth===1));assert.ok(subset.some(p=>p.concept.id==='MATH_025'&&p.depth===4));
+ assert.equal(new Set(subset.map(p=>p.concept.id)).size,14);assert.ok(!parents.some(p=>p.concept.curriculum==='algebra'));
+ assert.deepEqual(report([],{relationships:[]}).prerequisites,[]);
+});
+test('Prerequisite overview keeps nearest depth and terminates safely with repeated edges or a cycle',()=>{
+ const extra=[['F03','1.6','prerequisite'],['F03','1.6','prerequisite'],['1.6','F03','prerequisite'],['1.7','1.6','related']].map(([source,target,type])=>({source,target,type}));
+ const parents=report([],{relationships:[...relationships,...extra]}).prerequisites;
+ assert.equal(parents.length,7);assert.equal(parents.find(p=>p.concept.id==='F03').depth,1);assert.ok(!parents.some(p=>['1.6','1.7'].includes(p.concept.id)));
+});
+test('Prerequisite accuracy and emotion summaries match their own graph reports and do not contaminate the selected skill',()=>{
+ const {attempts}=conceptReportFixture(),copy=structuredClone(attempts),r=report(attempts),own=report(attempts.filter(a=>a.conceptId==='1.6'));
+ assert.deepEqual(r.row,own.row);assert.deepEqual(r.history,own.history);
+ for(const p of r.prerequisites){
+  const individual=report(attempts,{conceptId:p.concept.id});
+  for(const key of ['accuracy','latestAccuracy','latestCorrect','attempted','available','status','emotions','expression','change'])assert.deepEqual(p[key],individual.row[key]);
+  assert.deepEqual(p.observations,individual.observations);
+ }
+ const limits=r.prerequisites.find(p=>p.concept.id==='1.5'),factoring=r.prerequisites.find(p=>p.concept.id==='F02'),foundation=r.prerequisites.find(p=>p.concept.id==='F03');
+ assert.equal(limits.accuracy,.8);assert.equal(limits.status,'passed');assert.equal(limits.expression.records,2);
+ assert.equal(factoring.accuracy,0);assert.equal(factoring.expression.label,'Fear');assert.equal(factoring.observations.sentimentScore,-80);
+ assert.equal(foundation.emotions,null);assert.notEqual(foundation.change,null);assert.equal(foundation.observations.checkIns,1);
+ r.prerequisites[0].concept.title='Changed copy';assert.deepEqual(attempts,copy);assert.notEqual(concepts.find(c=>c.id==='1.5').title,'Changed copy');
 });
