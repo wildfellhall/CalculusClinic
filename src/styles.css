@@ -332,3 +332,52 @@ button,select,input[type=search]{box-shadow:none}
 .completed-reflection{margin:20px 0;text-align:left;border:1px dashed #c5dccb;border-radius:12px;padding:15px}
 .completed-reflection>summary{cursor:pointer;font-size:14px;color:var(--green)}
 @media(max-width:520px){.progress-check{padding:25px 18px}.progress-check header{margin-bottom:22px;padding-bottom:16px}.progress-check h1{font-size:29px}.progress-check header p{font-size:14px}.reflection-field legend{font-size:15px}.reflection-scale{gap:5px}.reflection-scale label>span{padding:9px 3px;font-size:11px;min-height:86px}.reflection-scale strong{font-size:21px}.reflection-feelings{gap:7px}.reflection-feelings label>span{font-size:13px;padding:8px 11px}.progress-check .button-row{gap:10px 18px}.progress-check .button.primary{font-size:14px}.progress-check-history{padding:16px}.progress-check-history>summary>span{display:block;margin:6px 0 0}.reflection-history-list time{margin-left:0}.reflection-response{gap:12px 18px}}
+
+/* Optional tools share the practice card's soft, stitched-paper frame. */
+.practice-tool-launcher{display:flex;justify-content:flex-end;gap:8px;margin:0 0 16px}
+.practice-tool-launcher .button{min-height:40px;font-size:13px}
+.practice-tool-launcher [aria-expanded="true"]{background:var(--mint);border-color:#81ae93}
+.practice-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
+.practice-primary{min-width:0}
+.practice-page.with-tools{max-width:1180px}
+.practice-page.with-tools .practice-top{max-width:none}
+.practice-page.with-tools .question-title{scroll-margin-top:20px}
+.practice-workspace.has-tools{grid-template-columns:minmax(0,1fr) 310px}
+.practice-tools{position:sticky;top:18px;min-width:0;max-height:calc(100dvh - 36px);overflow:auto;border:1px solid #aecdb9;border-radius:18px;padding:20px;background:#f0fcf4;outline:1px dashed #c3dacb;outline-offset:-6px;scrollbar-width:thin}
+.practice-tool-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.practice-tool-heading h2{font-size:23px}
+.practice-tool-heading .text-link{font-size:12px;min-height:36px}
+.calculator-form{min-width:0}
+#calculator-expression{display:block;width:100%;border:1px solid #afcbb8;border-radius:10px 10px 0 0;background:var(--paper);font-size:16px;padding:12px;min-height:46px}
+#calculator-result{display:block;min-height:45px;padding:10px 12px;border:1px solid #afcbb8;border-top:1px dashed #cdded1;border-radius:0 0 10px 10px;background:var(--paper);text-align:right;font-size:17px;overflow-wrap:anywhere;line-height:1.5;font-variant-numeric:tabular-nums}
+#calculator-result.calculator-error{font-size:13px;text-align:left;color:#884d37;background:#fff2e8}
+.calculator-options{display:flex;align-items:center;gap:10px;margin:10px 0}
+.calculator-options select{font-size:12px;padding:7px 25px 7px 9px;min-height:36px;margin-right:auto}
+.calculator-options button{font-size:13px;min-width:36px;min-height:36px;border-radius:8px}
+.calculator-keys{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.calculator-keys button,.calculator-functions button{min-height:42px;border:1px solid #c0d6c6;border-radius:9px;background:var(--paper);font-size:16px}
+.calculator-keys button:hover,.calculator-functions button:hover,.calculator-options button:hover{background:#e0f2e5;border-color:#84ad91}
+.calculator-keys .calculator-equals{background:var(--mint);border-color:#86b399;font-weight:800}
+.calculator-scientific{font-size:12px;margin-top:14px}
+.calculator-scientific summary{cursor:pointer;min-height:32px;color:var(--green)}
+.calculator-functions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:8px 0}
+.calculator-functions button{font-size:12px;min-height:36px}
+.calculator-scientific p{color:var(--muted);font-size:12px}
+#calculator-to-notes{font-size:12px;margin-top:8px;min-height:36px}
+.notepad-label{display:block;font-size:12px;color:var(--muted);margin-bottom:10px}
+#practice-notepad{display:block;width:100%;min-height:210px;max-height:50dvh;resize:vertical;border:1px solid #d8cba9;border-radius:11px;padding:13px;background:#fffaf0;font:15px/1.8 Nunito,'Trebuchet MS',sans-serif;color:var(--ink)}
+#practice-notepad:focus-visible{outline:3px solid #548e72;outline-offset:3px}
+.notepad-footer{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;margin-top:12px}
+#notepad-status{font-size:11px;line-height:1.6;color:var(--muted);max-width:170px}
+#notepad-clear{font-size:12px;flex-shrink:0;min-height:36px}
+@media(max-width:950px){
+ .practice-page.with-tools{max-width:850px;padding-bottom:calc(54dvh + 24px)}
+ .practice-workspace.has-tools{grid-template-columns:minmax(0,1fr)}
+ .practice-tools{position:fixed;z-index:20;top:auto;bottom:12px;right:16px;left:16px;margin:auto;max-width:440px;max-height:50dvh;padding:16px 20px;overscroll-behavior:contain;box-shadow:0 2px 12px #2946370a}
+ .practice-tool-heading{position:sticky;top:-16px;background:#f0fcf4;padding-top:8px;padding-bottom:4px;margin-top:-8px;z-index:1}
+ .practice-tool-heading h2{font-size:21px}
+ #practice-notepad{height:160px;min-height:140px;max-height:30dvh}
+ .calculator-keys button{min-height:38px}
+ .practice-tool-launcher .button{min-height:44px}
+}
+@media print{.practice-tool-launcher,.practice-tools{display:none!important}.practice-workspace.has-tools{display:block}.practice-page.with-tools{padding-bottom:0}}
