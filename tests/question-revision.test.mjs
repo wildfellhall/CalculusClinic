@@ -13,7 +13,7 @@ const originals=[...originalCalculus,...originalAlgebra];
 const record=(q,i=0,correct=true)=>({id:`revision-${q.id}`,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:correct?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct,answeredAt:new Date(Date.UTC(2026,9,12,12,i)).toISOString(),sessionId:'revision-test',durationMs:50000});
 
 test('All four courses retain ten complete problems per concept and unique active identities',()=>{
- assert.equal(catalog.questions.length,2130);
+ assert.equal(catalog.questions.length,2330);
  assert.equal(new Set(catalog.attemptQuestions.map(q=>q.id)).size,catalog.attemptQuestions.length);
  for(const c of catalog.concepts){
   const items=catalog.questions.filter(q=>q.conceptId===c.id);

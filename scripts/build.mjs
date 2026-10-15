@@ -12,7 +12,7 @@ for(const c of concepts){
 }
 await mkdir('dist/data',{recursive:true});
 await mkdir('dist/src',{recursive:true});
-const metadata={schemaVersion:'1.1.0',bankVersion:BANK_VERSION,compatibleBankVersions:COMPATIBLE_BANK_VERSIONS,updated:'2026-10-12',granularity:'Concept groups with explicit subskills and course membership',questionCount:questions.length,conceptCount:concepts.length,scope:'AP Calculus AB/BC and Texas TEKS Algebra I/II, including prerequisite support',edgeDirection:'prerequisite → dependent',dependencyStatus:'Author-designed teaching model, not an official standards dependency graph',assessmentStatus:'Original sampled practice; not psychometrically calibrated; coverage does not establish mastery of every standard'};
+const metadata={schemaVersion:'1.1.0',bankVersion:BANK_VERSION,compatibleBankVersions:COMPATIBLE_BANK_VERSIONS,updated:'2026-10-15',granularity:'Concept groups with explicit subskills and course membership',questionCount:questions.length,conceptCount:concepts.length,scope:'AP Calculus AB/BC and Texas TEKS Algebra I/II, including prerequisite support',edgeDirection:'prerequisite → dependent',dependencyStatus:'Author-designed teaching model, not an official standards dependency graph',assessmentStatus:'Original sampled practice; not psychometrically calibrated; coverage does not establish mastery of every standard'};
 const coverage=curriculumCoverage(concepts,questions,standards);
 metadata.coverageScope=COVERAGE_SCOPE;
 metadata.revisedQuestionCount=archivedQuestions.length;

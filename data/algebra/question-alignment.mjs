@@ -2,6 +2,7 @@
 // References name historical slots; resolve a revised slot to its active ID.
 // Graph/tool standards are sampled by calculations and interpretation here;
 // selected responses do not assess independent graph construction or tool use.
+import {ADDED_QUESTION_EVIDENCE} from './expansion.mjs';
 const evidence=String.raw`
 A.2A|49:1,2,3,4,5,6,7,8,10
 A.2B|50:1,2,3
@@ -103,7 +104,8 @@ A2.8C|85:4,5,6,7,8,10
 `.trim();
 export function questionAlignment(questions){
  const bySlot=new Map(questions.map(q=>[q.replaces??q.id,q]));
- return new Map(evidence.split('\n').map(line=>{
+ const aligned=new Map();
+ for(const line of [evidence,ADDED_QUESTION_EVIDENCE].join('\n').split('\n')){
   const [standardId,groups]=line.split('|');
   const ids=groups.split(';').flatMap(group=>{
    const [node,slots]=group.split(':');
@@ -113,6 +115,7 @@ export function questionAlignment(questions){
     return q.id;
    });
   });
-  return [standardId,ids];
- }));
+  aligned.set(standardId,[...new Set([...(aligned.get(standardId)??[]),...ids])]);
+ }
+ return aligned;
 }

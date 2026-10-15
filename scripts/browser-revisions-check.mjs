@@ -29,7 +29,7 @@ try{
  await change('#course','BC');await change('#graph-concept','1.11');assert.deepEqual(await graphNode('1.11'),{status:'partial',score:'80'});
  await click('[data-view="settings"]');assert.match(await run('document.querySelector("#archived-attempt-note").textContent'),/12 earlier answers/);
  await run('window.qaDownloads=[];URL.createObjectURL=b=>{qaDownloads.push(b);return "blob:qa"};HTMLAnchorElement.prototype.click=function(){}');
- await click('[data-action="backup"]');const backup=JSON.parse(await run('await qaDownloads[0].text()'));assert.deepEqual(backup.attempts,fixture);assert.equal(backup.bankVersion,'1.3.0');
+ await click('[data-action="backup"]');const backup=JSON.parse(await run('await qaDownloads[0].text()'));assert.deepEqual(backup.attempts,fixture);assert.equal(backup.bankVersion,'1.4.0');
  // The import path uses historical keys too; importing the same backup is idempotent.
  await run(`(()=>{const file=new File([${JSON.stringify(JSON.stringify({schemaVersion:1,bankVersion:'1.2.0',attempts:fixture}))}],'old-progress.json',{type:'application/json'});const transfer=new DataTransfer();transfer.items.add(file);const input=document.querySelector('#import-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  await waitFor('document.querySelector("#toast").textContent.includes("Imported 0 new attempts")');assert.deepEqual(await stored(),fixture);

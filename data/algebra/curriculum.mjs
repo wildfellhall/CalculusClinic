@@ -1,5 +1,6 @@
 import original from './source-ontology.json' with {type:'json'};
 import {algebraId,standards,TEKS_URL} from './standards.mjs';
+import {ALGEBRA1_ADDITIONS,ADDED_PREREQUISITES} from './expansion.mjs';
 export {standards} from './standards.mjs';
 export const units=[
  [11,'Number foundations','#f7edd8'],[12,'Rational numbers & proportions','#e0edf9'],[13,'Expressions & equations','#DDFEEA'],[14,'Linear relationships','#e9e2fa'],[15,'Polynomials & powers','#fce6da'],[16,'Quadratics','#f8e4ec'],[17,'Exponentials & sequences','#DDFEEA'],[18,'Functions & transformations','#e0edf9'],[19,'Systems & inequalities','#f8efcc'],[20,'Exponentials & logarithms','#e9e2fa'],[21,'Radical & rational functions','#fce6da'],[22,'Advanced algebra & modeling','#DDFEEA']
@@ -103,9 +104,10 @@ const foundation=original.nodes.map(n=>{
  const unit=number<=4?11:number<=20?12:number<=36?13:14;
  return {id:n.id,title:n.name,unit,objective:n.definition,rule,misconception,firstStep,subskills:skills.split(';'),prerequisites:n.prerequisites,algebraLevel:1,foundation:number<=33||[37,38].includes(number),originalCategory:n.category,originalGrade:n.grade};
 });
-const expanded=added.split('\n').map(row=>{
+const expanded=[added,ALGEBRA1_ADDITIONS].join('\n').split('\n').map(row=>{
  const [n,title,u,pre,objective,rule,misconception,firstStep,skills]=row.split('|');
- return {id:algebraId(n),title,unit:Number(u),prerequisites:pre.split(',').map(algebraId),objective,rule,misconception,firstStep,subskills:skills.split(';'),algebraLevel:Number(n)<=65?1:2,foundation:false};
+ const prerequisites=[...new Set([...pre.split(',').map(algebraId),...(ADDED_PREREQUISITES[n]??[]).map(algebraId)])];
+ return {id:algebraId(n),title,unit:Number(u),prerequisites,objective,rule,misconception,firstStep,subskills:skills.split(';'),algebraLevel:Number(n)<=65||Number(n)>=87?1:2,foundation:false};
 });
 export const concepts=[...foundation,...expanded].map(c=>({...c,curriculum:'algebra',scope:c.foundation?'Foundation':c.algebraLevel===1?'Algebra I & II':'Algebra II',cedTopic:null,standardIds:standards.filter(s=>s.conceptIds.includes(c.id)).map(s=>s.id),alignment:c.foundation?'Prerequisite support':'TEKS content alignment',potentialFriction:c.misconception,support:c.firstStep,representations:['symbolic','verbal',...(/graph|table|coordinate/i.test(c.title+' '+c.objective)?['graphical','numerical']:[])],practices:['procedures','representations','justification'],sourceIds:[...(Number(c.id.slice(5))<=48?['local-algebra-ontology']:[]),'texas-teks-high-school']}));
 const byId=new Map(concepts.map(c=>[c.id,c]));
@@ -115,5 +117,5 @@ export const relationships=concepts.flatMap(c=>c.prerequisites.map(source=>{
 }));
 export const sources=[
  {id:'local-algebra-ontology',title:'Original local mathematics ontology',url:null,checked:'2026-10-12',note:'The original 48 nodes and 80 prerequisite links from GraphRAGApplication/ontology.json are preserved; the source copy is in data/algebra/source-ontology.json.'},
- {id:'texas-teks-high-school',title:'Texas Education Agency · High-school mathematics TEKS',url:TEKS_URL,checked:'2026-10-12',note:'Algebra I §111.39 and Algebra II §111.40, adopted 2012, as linked from TEA’s current Chapter 111 directory. References map curriculum coverage; they do not establish TEA approval or assessment validity. Foundation nodes support the courses. Selected-response checks do not assess the full process standards or replace hands-on graphing and technology tasks.'}
+ {id:'texas-teks-high-school',title:'Texas Education Agency · High-school mathematics TEKS',url:TEKS_URL,checked:'2026-10-15',note:'Algebra I §111.39 and Algebra II §111.40, adopted 2012, as linked from TEA’s current Chapter 111 directory. References map curriculum coverage; they do not establish TEA approval or assessment validity. Foundation nodes support the courses. Selected-response checks do not assess the full process standards or replace hands-on graphing and technology tasks.'}
 ];

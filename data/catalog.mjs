@@ -9,5 +9,5 @@ export const units=[...calculus.units,...algebra.units];
 export const sources=[...calculus.sources,...algebra.sources];
 export const standards=algebra.standards;
 export const {questions,archivedQuestions,attemptQuestions,replacements}=reviseQuestions([...calculusBank.questions,...algebraBank.questions]);
-export const BANK_VERSION=REVISION_VERSION;
-export const COMPATIBLE_BANK_VERSIONS=[...calculusBank.COMPATIBLE_BANK_VERSIONS,algebraBank.ALGEBRA_BANK_VERSION,BANK_VERSION];
+export const BANK_VERSION=algebraBank.ALGEBRA_EXPANSION_VERSION;
+export const COMPATIBLE_BANK_VERSIONS=[...calculusBank.COMPATIBLE_BANK_VERSIONS,algebraBank.ALGEBRA_BANK_VERSION,REVISION_VERSION,BANK_VERSION];

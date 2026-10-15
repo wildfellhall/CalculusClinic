@@ -10,8 +10,8 @@ The graph can show one concept’s neighborhood, a unit and its immediate prereq
 
 | Learning path | Concepts | Scope |
 | --- | ---: | --- |
-| Algebra I | 65 | Linear relationships, quadratics, exponential models, and foundations |
-| Algebra II | 86 | Advanced functions and algebra, including Algebra I prerequisites |
+| Algebra I | 85 | Linear relationships, quadratics, exponential models, and foundations |
+| Algebra II | 106 | Advanced functions and algebra, including Algebra I prerequisites |
 | AP Calculus AB | 97 | Limits, derivatives, integrals, differential equations, and foundations |
 | AP Calculus BC | 127 | AB content plus parametric and polar calculus and infinite series |
 | Calculus subset | 15 | A focused Algebra I/II route into factoring-based algebraic limits |

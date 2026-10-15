@@ -30,20 +30,25 @@ try{
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.qaDocument=crypto.randomUUID();navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('QA camera denied','NotAllowedError')};`});
  await load('Page.navigate',{url:appURL+'/'});await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});assert.equal(await run('document.querySelectorAll("[data-action=choose-course]").length'),5);await snap('algebra-onboarding');
  await click('[data-course="ALG1"]');await finishOnboardingWithoutCamera(run,waitFor);await waitFor('!!document.querySelector(".explore-home")');assert.equal(await choice(),'ALG1');assert.match(await run('document.querySelector("h1").textContent'),/algebra/);await snap('algebra-home');
- await click('[data-view="practice"]');assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');assert.equal(await run('document.querySelector("#practice-concept").options.length'),65);
+ await click('[data-view="practice"]');assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');assert.equal(await run('document.querySelector("#practice-concept").options.length'),85);
  await click('[data-action="diagnostic"]');for(let i=0;i<3;i++)await answerNext(true);
  assert.equal((await stored()).length,3);await load();assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'continue');await click('[data-action="diagnostic"]');
  assert.match(await run('document.querySelector(".question-meta").textContent'),/OF 7/);for(let i=3;i<10;i++)await answerNext(i<8);
  await skipProgressCheck(run);await waitFor('!!document.querySelector(".practice-complete")');const history=await stored();assert.equal(history.length,10);assert.equal(history.filter(a=>a.correct).length,8);assert.ok(history.every(a=>Number.isFinite(a.durationMs)&&a.durationMs>0));assert.notEqual(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_034');
- await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),65);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
+ await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),85);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
+ // Every expanded skill is visible and has graphical prerequisite links.
+ for(let n=87;n<=106;n++){
+  const id=`MATH_${String(n).padStart(3,'0')}`;
+  assert.equal(await run(`!!document.querySelector('.graph-node[data-concept="${id}"]')&&!!document.querySelector('.edge[data-target="${id}"]')`),true,id);
+ }
  await change('#graph-mode','combined');assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});await change('#graph-mode','movement');assert.deepEqual(await node('MATH_034'),{score:'unscored',status:'passed'});await change('#graph-mode','accuracy');
  await change('#graph-scope','focus');await snap('algebra-diagnostic-graph');
  await change('#graph-concept','MATH_061');await click('[data-action="notes"]');assert.match(await run('document.querySelector(".concept-notes").textContent'),/A.8A/);
  await click('[data-action="practice"][data-id="MATH_061"]');assert.equal(await run('document.querySelectorAll(".question-title .katex").length>0'),true);await snap('algebra-quadratic-question');
  // Passing a shared check survives switching and reloading, while course-specific data stays filtered.
- await change('#course','ALG2');await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),86);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
+ await change('#course','ALG2');await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),106);assert.deepEqual(await node('MATH_034'),{score:'80',status:'passed'});
  await load();assert.equal(await choice(),'ALG2');assert.deepEqual(await stored(),history);
- const advanced=questions.filter(q=>q.conceptId==='MATH_078').map((q,i)=>({id:'advanced-'+i,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:i<6?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct:i<6,answeredAt:new Date(Date.UTC(2026,9,13,12,i)).toISOString(),sessionId:'algebra-qa',durationMs:50000}));
+ const advanced=questions.filter(q=>q.conceptId==='MATH_078').map((q,i)=>({id:'advanced-'+i,questionId:q.id,conceptId:q.conceptId,bankVersion:q.version,choiceId:i<6?q.correctOptionId:q.options.find(o=>o.id!==q.correctOptionId).id,correct:i<6,answeredAt:new Date(Date.parse(history.at(-1).answeredAt)+i+1).toISOString(),sessionId:'algebra-qa',durationMs:50000}));
  await run(`localStorage.setItem('calculus-clinic-progress-v1',JSON.stringify({schemaVersion:1,attempts:${JSON.stringify([...history,...advanced])}}))`);await load();
  assert.equal(await run('document.querySelector(".next-check").dataset.recommendation'),'prerequisite');assert.equal(await run('document.querySelector(".next-check").dataset.anchor'),'MATH_078');
  await click('[data-view="graph"]');await change('#graph-concept','MATH_078');await snap('algebra2-review-graph');
@@ -52,10 +57,28 @@ try{
  await click('[data-view="settings"]');const links=await run('[...document.querySelectorAll("a[download]")].map(a=>a.getAttribute("href"))');assert.ok(links.every(l=>l.startsWith('/data/alg2/')));for(const link of links)assert.ok((await fetch(appURL+link)).ok,link);
  await click('[data-action="export-progress"]');await waitFor('qaBlobs.length===2');const csv=await run('await qaBlobs[1].text()');assert.ok(csv.includes('MATH_078'));assert.ok(!csv.includes('Continuity at a point'));
  await change('#course','ALG1');await click('[data-action="export-progress"]');const csv1=await run('await qaBlobs[2].text()');assert.ok(csv1.includes('MATH_034'));assert.ok(!csv1.includes('MATH_078'));
- await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),65);assert.equal(await run(`!!document.querySelector('.graph-node[data-concept="MATH_078"]')`),false);
+ await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),85);assert.equal(await run(`!!document.querySelector('.graph-node[data-concept="MATH_078"]')`),false);
+ // Complete one of the new checks through the real question/survey flow.
+ await change('#graph-scope','focus');await change('#graph-concept','MATH_098');
+ for(const [source,target] of [['MATH_095','MATH_098'],['MATH_097','MATH_098'],['MATH_098','MATH_057']])assert.equal(await run(`!!document.querySelector('.edge[data-source="${source}"][data-target="${target}"]')`),true);
+ await snap('algebra-expanded-factoring-graph');
+ await click('[data-action="practice"][data-id="MATH_098"]');
+ assert.match(await run('document.querySelector(".question-meta").textContent'),/OF 10/);
+ assert.equal(await run('!!document.querySelector(".question-title .katex")'),true);await snap('algebra-expanded-factoring-question');
+ for(let i=0;i<10;i++)await answerNext(i<8);
+ await skipProgressCheck(run);await waitFor('!!document.querySelector(".practice-complete")');
+ assert.equal(await run('document.querySelector(".next-check").dataset.nextConcept'),'MATH_057');
+ const expandedHistory=await stored();assert.equal(expandedHistory.filter(a=>a.conceptId==='MATH_098').length,10);
+ await load();assert.deepEqual(await stored(),expandedHistory);
+ await click('[data-view="graph"]');await change('#graph-concept','MATH_098');assert.deepEqual(await node('MATH_098'),{score:'80',status:'passed'});
+ await run('window.qaBlobs=[];URL.createObjectURL=b=>{qaBlobs.push(b);return "blob:qa"};HTMLAnchorElement.prototype.click=function(){}');
+ await click('[data-action="export-concept-report"]');await waitFor('qaBlobs.length===1');
+ const expandedPDF=await run('await qaBlobs[0].arrayBuffer().then(b=>Array.from(new Uint8Array(b)))');
+ const conceptPDF=await PDFDocument.load(new Uint8Array(expandedPDF));assert.ok(conceptPDF.getPageCount()>2);
+ await writeFile('test-results/pdfs/algebra-expanded-factoring.pdf',new Uint8Array(expandedPDF));
  await change('#course','AB');await change('#graph-scope','all');assert.equal(await run('document.querySelectorAll(".graph-node").length'),97);await change('#course','BC');assert.equal(await run('document.querySelectorAll(".graph-node").length'),127);
  await change('#course','ALG2');await change('#graph-scope','focus');await change('#graph-concept','MATH_078');
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,screenWidth:390,screenHeight:844,deviceScaleFactor:1,mobile:true});await waitFor('innerWidth===390');assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true);await waitFor('!document.querySelector("#toast").classList.contains("show")');await snap('algebra2-mobile-graph');
  await click('[data-view="settings"]');await click('#delete-data');await click('[data-action="confirm-delete"]');assert.equal((await stored()).length,0);assert.equal(await choice(),'ALG2');await click('[data-view="graph"]');await change('#graph-scope','all');assert.equal(await run('[...document.querySelectorAll(".graph-node")].every(n=>n.dataset.fillScore==="unscored")'),true);
- assert.deepEqual(errors,[]);console.log('PASS Algebra onboarding, 8/10 diagnostic completion, partial resume, prerequisite probing, persistence across courses, graph shading, standards, math, scoped exports, PDF, mobile, and deletion.');
+ assert.deepEqual(errors,[]);console.log('PASS Algebra onboarding, 20 connected expanded skills, new 10-question check and PDF, 8/10 diagnostic completion, partial resume, prerequisite probing, persistence across courses, graph shading, standards, math, scoped exports, PDF, mobile, and deletion.');
 }finally{ws.close();}

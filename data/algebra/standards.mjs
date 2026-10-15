@@ -1,3 +1,4 @@
+import {ADDED_STANDARD_NODES} from './expansion.mjs';
 // Original summaries of the currently linked TEA high-school TEKS, not quotations.
 export const TEKS_URL='https://tea.texas.gov/laws-and-rules/sboe-rules-tac/sboe-tac-currently-effect/ch111c.pdf';
 const raw=`
@@ -117,5 +118,6 @@ export const algebraId=n=>`MATH_${String(n).padStart(3,'0')}`;
 export const standards=raw.split('\n').map(line=>{
  const [prefix,code,summary,nodes]=line.split('|');
  const [,section,letter]=/^(\d+)([A-Z])$/.exec(code);
- return {id:`${prefix}.${code}`,course:prefix==='A'?'ALG1':'ALG2',reference:`§111.${prefix==='A'?'39':'40'}(c)(${section})(${letter})`,summary,kind:section==='1'?'process':'content',conceptIds:nodes.split(',').map(algebraId),sourceUrl:TEKS_URL,coverage:section==='1'?'Supporting selected-response practice; extended reasoning and tool use require additional work':'Concept and sampled practice alignment'};
+ const id=`${prefix}.${code}`,conceptIds=[...new Set([...nodes.split(',').map(algebraId),...(ADDED_STANDARD_NODES[id]??[]).map(algebraId)])];
+ return {id,course:prefix==='A'?'ALG1':'ALG2',reference:`§111.${prefix==='A'?'39':'40'}(c)(${section})(${letter})`,summary,kind:section==='1'?'process':'content',conceptIds,sourceUrl:TEKS_URL,coverage:section==='1'?'Supporting selected-response practice; extended reasoning and tool use require additional work':'Concept and sampled practice alignment'};
 });

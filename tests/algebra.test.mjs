@@ -24,10 +24,10 @@ test('Algebra preserves every source node, prerequisite, and rationale',()=>{
  assert.equal(source.nodes.length,48);assert.equal(source.edges.length,80);
  for(const n of source.nodes){const c=algebra.concepts.find(c=>c.id===n.id);assert.equal(c.title,n.name);assert.equal(c.objective,n.definition);assert.deepEqual(c.prerequisites,n.prerequisites);}
  for(const edge of source.edges){const e=algebra.relationships.find(e=>e.source===edge.source&&e.target===edge.target);assert.equal(e.rationale,edge.rationale);assert.equal(e.type,'prerequisite');}
- assert.equal(topologicalOrder(algebra.concepts,algebra.relationships).length,86);
+ assert.equal(topologicalOrder(algebra.concepts,algebra.relationships).length,106);
 });
 test('Each of four courses is closed under prerequisite dependencies and contains only its curriculum',()=>{
- for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127]]){
+ for(const [course,count] of [['ALG1',85],['ALG2',106],['AB',97],['BC',127]]){
   const nodes=catalog.concepts.filter(c=>courseIncludes(course,c)),ids=new Set(nodes.map(c=>c.id));assert.equal(nodes.length,count);
   for(const c of nodes)for(const p of c.prerequisites)assert.ok(ids.has(p),`${course}: ${c.id} needs ${p}`);
   assert.ok(ids.has(COURSES[course].entryId));
@@ -47,9 +47,9 @@ test('The TEKS crosswalk covers every content and process expectation with valid
  for(const c of algebra.concepts.filter(c=>!c.foundation))assert.ok(c.standardIds.some(s=>!/^A2?\.1[A-G]$/.test(s)),c.id);
 });
 test('Every Algebra node has ten unique, complete, stable questions and three distinct choices',()=>{
- assert.equal(algebraQuestions.length,860);assert.equal(new Set(catalog.questions.map(q=>q.id)).size,2130);
+ assert.equal(algebraQuestions.length,1060);assert.equal(new Set(catalog.questions.map(q=>q.id)).size,2330);
  for(const c of algebra.concepts){const qs=algebraQuestions.filter(q=>q.conceptId===c.id);assert.equal(qs.length,10,c.id);assert.equal(new Set(qs.map(q=>q.prompt)).size,10,c.id);
-  for(const [i,q] of qs.entries()){assert.equal(q.id,`${c.id}-Q${i+1}`);assert.equal(q.options.length,3);assert.equal(new Set(q.options.map(o=>o.text.trim().toLowerCase())).size,3,q.id);assert.equal(q.options.filter(o=>o.id===q.correctOptionId).length,1);assert.ok(q.explanation.trim().length>0,q.id);assert.equal(q.version,'1.2.0');}
+  for(const [i,q] of qs.entries()){assert.equal(q.id,`${c.id}-Q${i+1}`);assert.equal(q.options.length,3);assert.equal(new Set(q.options.map(o=>o.text.trim().toLowerCase())).size,3,q.id);assert.equal(q.options.filter(o=>o.id===q.correctOptionId).length,1);assert.ok(q.explanation.trim().length>0,q.id);assert.equal(q.version,Number(c.id.slice(5))>=87?'1.4.0':'1.2.0');}
  }
 });
 test('Algebra math compiles, preserves source text, and leaves no raw formula shorthand',()=>{
@@ -73,7 +73,7 @@ test('Saved Algebra mastery follows shared nodes across courses and stays out of
  const one=diagnose('ALG1',attempts),two=diagnose('ALG2',attempts),bc=diagnose('BC',attempts);
  assert.equal(one.nodes.get(id(34)).status,'passed');assert.equal(two.nodes.get(id(34)).correctnessScore,.8);assert.equal(one.nodes.has(id(78)),false);assert.equal(two.latestPassedId,id(78));assert.equal(bc.summary.unseen,127);
  for(const mode of ['accuracy','combined','movement']){
-  const view=graphViewProgress(one.nodes,attempts,mode),profile=graphProfile(view);assert.equal(profile.total,65);
+  const view=graphViewProgress(one.nodes,attempts,mode),profile=graphProfile(view);assert.equal(profile.total,85);
   assert.equal(view.get(id(34)).display.score,mode==='movement'?null:.8);
  }
  const svg=drawGraph(graphLayout(algebra.concepts.filter(c=>c.id===id(34)),[]),catalog.units,{progress:graphViewProgress(one.nodes,attempts,'accuracy')});assert.ok(svg.includes(masteryFill(.8)));
@@ -89,7 +89,7 @@ test('Reports and generated course downloads exclude unrelated courses and retai
  // This integration test builds its own artifacts, so npm test also works from a fresh checkout.
  await import('../scripts/build.mjs');
  const attempts=[...set(34,8),...set(78,6)];
- for(const [course,count] of [['ALG1',65],['ALG2',86],['AB',97],['BC',127],['CALC_SUBSET',15]]){
+ for(const [course,count] of [['ALG1',85],['ALG2',106],['AB',97],['BC',127],['CALC_SUBSET',15]]){
   const report=reportData({...catalog,course,attempts});assert.equal(report.rows.length,count);assert.equal(report.profile.total,count);
   const exported=JSON.parse(await readFile(`dist/data/${course.toLowerCase()}/ontology.json`,'utf8'));
   assert.equal(exported.concepts.length,count);assert.equal(exported.questions.length,count*10);assert.equal(exported.metadata.title,COURSES[course].title);

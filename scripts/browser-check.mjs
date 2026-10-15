@@ -285,7 +285,7 @@ try{
     const response=await fetch(appURL+'/data/'+path);assert.equal(response.status,200,path);assert.ok((await response.text()).length>100,path);
   }
   const exported=await (await fetch(appURL+'/data/ontology.json')).json();
-  assert.equal(exported.questions.length,2130);
+  assert.equal(exported.questions.length,2330);
   assert.ok(exported.concepts.every(c=>exported.questions.filter(q=>q.conceptId===c.id).length===10));
 
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
