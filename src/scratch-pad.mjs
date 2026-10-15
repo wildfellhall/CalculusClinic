@@ -50,6 +50,7 @@ export class ScratchPad {
     if(this.canvas?.hasPointerCapture(id))this.canvas.releasePointerCapture(id);
     this.paint();this.update();
   }
+  snapshot(id){this.finish();return this.data.snapshot(id);}
   render(canvas,width,height,dpr=1){renderScratch(canvas,[...this.data.page(this.id).strokes,...(this.stroke?[this.stroke]:[])],width,height,dpr);}
   paint(){
     if(!this.canvas?.isConnected)return;
@@ -73,7 +74,7 @@ export class ScratchPad {
   }
   update(message){
     if(!this.canvas)return;const root=this.canvas.closest('#practice-tools-root'),page=this.data.page(this.id);
-    root.querySelector('#scratch-status').textContent=message||(page.saved?'Saved for this concept.':'Drawing is kept here, but could not be saved. Save an image before leaving.');
+    root.querySelector('#scratch-status').textContent=message||(page.saved?'Saved for this concept. A snapshot is kept when you check an answer.':'Drawing is kept here, but could not be saved. Save an image before leaving.');
     for(const action of ['undo','redo'])root.querySelector(`[data-scratch="${action}"]`).disabled=!page[action].length;
     root.querySelector('[data-scratch="clear"]').disabled=!page.strokes.length;
     for(const tool of ['pen','eraser'])root.querySelector(`[data-scratch="${tool}"]`).setAttribute('aria-pressed',String(this.tool===tool));

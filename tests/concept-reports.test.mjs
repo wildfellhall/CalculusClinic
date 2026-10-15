@@ -18,12 +18,17 @@ test('Timing distinguishes zero from missing, includes retries, and separates co
  assert.deepEqual(r.timing,{count:2,missing:1,total:120000,average:60000,median:60000,fastest:0,slowest:120000,correctAverage:0,incorrectAverage:120000});
  assert.equal(r.items[2].attempts.length,0);assert.equal(report([]).timing.total,null);
 });
-test('Concept report copies scoring preferences, camera estimates, check-ins, scratch drawing and reflections without mutating their sources',()=>{
+test('Concept report copies scoring preferences, camera estimates, check-ins, attempt snapshots and reflections without mutating their sources',()=>{
  const summary=new ExpressionSummary('baseline');for(let i=0;i<4;i++)summary.add(Object.fromEntries(Object.keys(EXPRESSION_LABELS).map(k=>[k,k==='fearful'?1:0])),100,i*200);
  const a={...attempt(qs[0],1),facialExpression:summary.finish(),selfReport:selfReport({emotion:'fear',intensity:5,valence:'unpleasant'})};
- const scratch={strokes:[{tool:'pen',color:'#294637',width:5,points:[[10,20],[30,40]]}],saved:false},check={id:'set1',conceptId:'1.6',completedAt:a.answeredAt,status:'completed',note:'Recheck the factors'};
- const off=report([a]),on=report([a],{preferences:{includeSelfReports:true},scratch,progressChecks:[check],notes:'A note'});
- assert.equal(on.row.emotions,0);assert.equal(off.row.combined,.08);assert.equal(on.row.combined,.078);assert.equal(on.observations.checkIns,1);assert.equal(on.progressChecks.length,1);on.scratch.strokes[0].points[0][0]=50;assert.equal(scratch.strokes[0].points[0][0],10);assert.equal(on.notes,'A note');
+ const scratchSnapshot={version:1,strokes:[{tool:'pen',color:'#294637',width:5,points:[[10,20],[30,40]]}]},check={id:'set1',conceptId:'1.6',completedAt:a.answeredAt,status:'completed',note:'Recheck the factors'};a.scratchSnapshot=scratchSnapshot;
+ const off=report([a]),on=report([a],{preferences:{includeSelfReports:true},progressChecks:[check],notes:'A note'});
+ assert.equal(on.row.emotions,0);assert.equal(off.row.combined,.08);assert.equal(on.row.combined,.078);assert.equal(on.observations.checkIns,1);assert.equal(on.progressChecks.length,1);on.items[0].attempts[0].scratchSnapshot.strokes[0].points[0][0]=50;assert.equal(scratchSnapshot.strokes[0].points[0][0],10);assert.equal(on.notes,'A note');
+});
+test('Reports link each snapshot to its exact question and retry and never substitute the current pad for legacy attempts',()=>{
+ const {attempts,scratch}=conceptReportFixture(),r=report(attempts,{scratch}),first=r.items[0].attempts;
+ assert.equal(first.length,3);assert.notDeepEqual(first[0].scratchSnapshot,first[1].scratchSnapshot);assert.notDeepEqual(first[1].scratchSnapshot,first[2].scratchSnapshot);
+ assert.deepEqual(r.items[1].attempts[0].scratchSnapshot,{version:1,strokes:[]});assert.ok(!Object.hasOwn(r.items.at(-1).attempts[0],'scratchSnapshot'));assert.ok(!Object.hasOwn(r,'scratch'));
 });
 test('Question-bank version mismatch fails instead of silently substituting another prompt; missing observations stay absent',()=>{
  assert.throws(()=>report([{...attempt(qs[0],1),bankVersion:'unknown'}]),/unavailable/);

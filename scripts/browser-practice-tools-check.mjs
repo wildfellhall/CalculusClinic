@@ -15,14 +15,16 @@ const size=width=>send('Emulation.setDeviceMetricsOverride',{width,height:900,de
 const snap=async name=>{const r=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile('test-results/'+name+'.png',Buffer.from(r.data,'base64'));};
 const key='calculus-clinic-scratch-v1:1.11';
 const strokes=()=>run(`JSON.parse(localStorage.getItem(${JSON.stringify(key)}))?.strokes||[]`);
+const attempts=()=>run('JSON.parse(localStorage.getItem("calculus-clinic-progress-v1"))?.attempts||[]');
 const start=async(id='1.11')=>{await run('document.querySelector(".practice-top [data-action=select]")?.click()');await click('[data-view="practice"]');await input('#practice-concept',id,'change');await click('[data-action="start-picked"]');};
 const canvas=()=>run('document.querySelector("#scratch-canvas").toDataURL()');
-const draw=async(points,pointerType='mouse')=>{
+const draw=async(points,pointerType='mouse',release=true)=>{
  const r=await run('document.querySelector("#scratch-canvas").getBoundingClientRect().toJSON()');
  const scale=Math.min(r.width/1000,r.height/700),point=([x,y])=>({x:r.x+(r.width-scale*1000)/2+x*scale,y:r.y+(r.height-scale*700)/2+y*scale});
  await send('Input.dispatchMouseEvent',{type:'mousePressed',...point(points[0]),button:'left',clickCount:1,pointerType});
  for(const p of points.slice(1))await send('Input.dispatchMouseEvent',{type:'mouseMoved',...point(p),button:'left',buttons:1,pointerType});
- await send('Input.dispatchMouseEvent',{type:'mouseReleased',...point(points.at(-1)),button:'left',clickCount:1,pointerType});
+ if(release)await send('Input.dispatchMouseEvent',{type:'mouseReleased',...point(points.at(-1)),button:'left',clickCount:1,pointerType});
+ return point(points.at(-1));
 };
 try{
  await mkdir('test-results',{recursive:true});await send('Runtime.enable');await send('Page.enable');await size(1440);await send('Storage.clearDataForOrigin',{origin:base,storageTypes:'local_storage'});await send('Page.navigate',{url:base});await enterCourse(run,waitFor);await send('Page.bringToFront');await send('Emulation.setFocusEmulationEnabled',{enabled:true});
@@ -37,9 +39,15 @@ try{
  await waitFor(`Number(document.querySelector("#question-timer").dataset.durationMs)>${before}`);assert.equal(await run('document.querySelector(".answer-options input:checked").value'),choice);
  await snap('practice-scratch-desktop');await click('[data-scratch="expand"]');assert.equal(await run('document.querySelector("#practice-tools-root").classList.contains("scratch-expanded")'),true);await snap('practice-scratch-expanded');await click('[data-scratch="expand"]');
  const saved=await strokes();await click('[data-tool-action="close"]');await click('#open-notepad');assert.deepEqual(await strokes(),saved);
- await click('[data-action="submit"]');await click('[data-action="next"]');assert.deepEqual(await strokes(),saved);await click('[data-view="graph"]');await click('[data-view="practice"]');assert.deepEqual(await strokes(),saved);
+ await click('[data-action="submit"]');assert.deepEqual((await attempts())[0].scratchSnapshot,{version:1,strokes:saved});
+ await draw([[100,500],[500,600]]);assert.deepEqual((await attempts())[0].scratchSnapshot.strokes,saved,'Feedback edits cannot rewrite the submitted snapshot');await click('[data-scratch="undo"]');
+ await click('[data-action="next"]');await click('[data-scratch="clear"]');await click('[data-tool-action="close"]');await click('.answer-options input');await click('[data-action="submit"]');assert.deepEqual((await attempts())[1].scratchSnapshot,{version:1,strokes:[]},'A blank pad is captured even when closed');
+ await click('#open-notepad');await click('[data-scratch="undo"]');await click('[data-action="next"]');await click('.answer-options input');
+ const end=await draw([[100,520],[300,620]],'mouse',false);assert.deepEqual(await strokes(),saved);await click('[data-action="submit"]');await send('Input.dispatchMouseEvent',{type:'mouseReleased',...end,button:'left',clickCount:1});
+ const submitted=await attempts();assert.equal(submitted[2].scratchSnapshot.strokes.length,saved.length+1,'Submission finishes an in-progress stroke before taking its snapshot');assert.deepEqual(submitted[0].scratchSnapshot.strokes,saved);await click('[data-scratch="undo"]');await click('[data-action="next"]');
+ assert.deepEqual(await strokes(),saved);await click('[data-view="graph"]');await click('[data-view="practice"]');assert.deepEqual(await strokes(),saved);
  // Reload and a different concept preserve each concept's work independently.
- await send('Page.reload');await waitFor('!!document.querySelector("[data-view=practice]")');await start('1.12');await click('#open-notepad');assert.equal(await run('document.querySelector("[data-scratch=clear]").disabled'),true);await draw([[200,200],[500,450]]);await start();assert.equal(await run('document.querySelector("[data-scratch=clear]").disabled'),false);assert.deepEqual(await strokes(),saved);
+ await send('Page.reload');await waitFor('!!document.querySelector("[data-view=practice]")');assert.deepEqual(await attempts(),submitted);await start('1.12');await click('#open-notepad');assert.equal(await run('document.querySelector("[data-scratch=clear]").disabled'),true);await draw([[200,200],[500,450]]);await start();assert.equal(await run('document.querySelector("[data-scratch=clear]").disabled'),false);assert.deepEqual(await strokes(),saved);
  // Touch drawing must stay inside the paper instead of scrolling the page.
  await size(390);await click('#open-notepad');await click('#open-notepad');await new Promise(r=>setTimeout(r,200));assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true);
  const r=await run('document.querySelector("#scratch-canvas").getBoundingClientRect().toJSON()'),scroll=await run('scrollY');
@@ -52,6 +60,10 @@ try{
  await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:process.cwd()+'/test-results',eventsEnabled:true});await click('[data-scratch="download"]');
  await click('.scratch-typed summary');await input('#practice-notepad','<img src=x onerror="window.qaInjected=true">');assert.equal(await run('!!window.qaInjected'),false);await click('#notepad-clear');assert.equal(await run('document.querySelector("#practice-notepad").value'),'');await click('#notepad-clear');assert.match(await run('document.querySelector("#practice-notepad").value'),/onerror/);
  await run(`localStorage.removeItem(${JSON.stringify(key)});window.dispatchEvent(new StorageEvent('storage',{key:${JSON.stringify(key)},newValue:null}))`);assert.equal(await run('document.querySelector("[data-scratch=clear]").disabled'),true,'Deleting drawings in another tab clears the visible page and undo history');
- await click('[data-view="settings"]');await click('[data-action="delete-data"]');await click('[data-action="confirm-delete"]');assert.equal(await run('Object.keys(localStorage).some(key=>key.startsWith("calculus-clinic-scratch-")||key==="calculus-clinic-notes-v1")'),false);
- assert.deepEqual(errors,[]);console.log('PASS scratch pen/eraser, undo/redo/clear, stylus and touch, per-concept persistence, resize/expand, image export, legacy notes, timer/answer continuity, quota recovery, and deletion.');
+ await click('[data-view="settings"]');await run('window.qaBlobs=[];URL.createObjectURL=b=>{qaBlobs.push(b);return "blob:qa"};HTMLAnchorElement.prototype.click=function(){}');await click('[data-action="backup"]');
+ const backup=await run('await qaBlobs[0].text()');assert.deepEqual(JSON.parse(backup).attempts,submitted);
+ await click('[data-action="delete-data"]');await click('[data-action="confirm-delete"]');assert.equal(await run('Object.keys(localStorage).some(key=>key.startsWith("calculus-clinic-scratch-")||key==="calculus-clinic-notes-v1"||key==="calculus-clinic-progress-v1")'),false);
+ await run(`(()=>{const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(backup)}],'snapshot-backup.json',{type:'application/json'}));const input=document.querySelector('#import-file');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitFor('document.querySelector("#toast").textContent.includes("Imported")');assert.deepEqual(await attempts(),submitted);
+ await send('Page.reload');await waitFor('!!document.querySelector("[data-view=settings]")');assert.deepEqual(await attempts(),submitted);await click('[data-view="settings"]');await click('[data-action="delete-data"]');await click('[data-action="confirm-delete"]');assert.deepEqual(await attempts(),[]);
+ assert.deepEqual(errors,[]);console.log('PASS scratch drawing/erasing, per-answer snapshots including blank and in-progress drawings, immutable submission history, reload and backup restore, undo/redo/clear, stylus and touch, resize/expand, image export, legacy notes, timer/answer continuity, quota recovery, and deletion.');
 }catch(error){await snap('practice-tools-failure');throw error;}finally{ws.close();}

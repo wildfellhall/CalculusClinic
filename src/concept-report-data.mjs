@@ -13,7 +13,7 @@ export function timingSummary(attempts){
 
 // Use the same scores as the graph, while keeping earlier bank versions and
 // every retry in a separate, complete answer history. Never mutate live records.
-export function conceptReportData({conceptId,concepts,relationships,questions,archivedQuestions=[],attempts,progressChecks=[],course='BC',preferences,scratch=null,notes='',generatedAt=new Date().toISOString()}){
+export function conceptReportData({conceptId,concepts,relationships,questions,archivedQuestions=[],attempts,progressChecks=[],course='BC',preferences,notes='',generatedAt=new Date().toISOString()}){
   const overall=reportData({concepts,relationships,questions,attempts,course,preferences,generatedAt}),row=overall.rows.find(r=>r.concept.id===conceptId);
   if(!row)throw new Error('This concept is not part of the selected course.');
   const current=questions.filter(q=>q.conceptId===conceptId),old=archivedQuestions.filter(q=>q.conceptId===conceptId),known=new Map([...old,...current].map(q=>[q.id+'|'+q.version,q]));
@@ -46,5 +46,5 @@ export function conceptReportData({conceptId,concepts,relationships,questions,ar
   const prerequisites=queue.slice(1).map(id=>({...rows.get(id),depth:depths.get(id),observations:observationStats(attempts,id)})).sort((a,b)=>a.depth-b.depth||a.concept.id.localeCompare(b.concept.id,undefined,{numeric:true}));
   return structuredClone({version:1,generatedAt,course,preferences:overall.preferences,policyVersion:overall.policyVersion,concept:row.concept,row,items,history,sessions,timing:timingSummary(history),observations:observationStats(history,conceptId),connections,prerequisites,
     archivedAttemptCount:history.filter(a=>!currentKeys.has(a.questionId+'|'+a.bankVersion)).length,
-    progressChecks:progressChecks.filter(c=>c.conceptId===conceptId).sort((a,b)=>a.completedAt.localeCompare(b.completedAt)),scratch,notes});
+    progressChecks:progressChecks.filter(c=>c.conceptId===conceptId).sort((a,b)=>a.completedAt.localeCompare(b.completedAt)),notes});
 }

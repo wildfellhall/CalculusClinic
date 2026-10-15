@@ -14,7 +14,7 @@ const stamp=value=>new Date(value).toISOString().replace('T',' ').replace('Z',' 
 const duration=ms=>formatDuration(ms)+(validDuration(ms)&&ms%1000?'.'+String(ms%1000).padStart(3,'0').replace(/0+$/,''):'');
 const plain=value=>String(value??'').replace(/[\u2010-\u2015\u2212]/g,'-').replaceAll('→','to').replace(/[\u0000-\u0008\u000b-\u001f]/g,'');
 
-export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images=new Map(),scratchPNG=null}){
+export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images=new Map(),scratchImages=new Map()}){
   const {PDFDocument,rgb}=PDFLib,doc=await PDFDocument.create();doc.registerFontkit(fontkit);
   const [body,bold,display]=await Promise.all(fonts.map(bytes=>doc.embedFont(bytes,{subset:true})));
   const W=595.28,H=841.89,M=38,CW=W-2*M,bottom=H-44;
@@ -55,8 +55,11 @@ export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images
       }
     }y+=12;
   }
+  const embeddedImages=new Map();
   async function picture(value,maxHeight=600){
-    if(!value)return;const img=await doc.embedPng(value.png||value),scale=Math.min(CW/img.width,maxHeight/img.height),height=img.height*scale,width=img.width*scale;
+    if(!value)return;const png=value.png||value;
+    if(!embeddedImages.has(png))embeddedImages.set(png,await doc.embedPng(png));
+    const img=embeddedImages.get(png),scale=Math.min(CW/img.width,maxHeight/img.height),height=img.height*scale,width=img.width*scale;
     ensure(height+8);page.drawImage(img,{x:M,y:H-y-height,width,height});y+=height+8;
   }
   function movementTable(metrics){
@@ -137,15 +140,20 @@ export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images
       else paragraph('Facial movement: not recorded.',{size:9,ink:C.muted});
       paragraph(s?`Self-report: ${s.emotion}; intensity ${s.intensity}/5; ${s.valence}; sentiment ${number(s.sentimentScore)}.`:'Self-report: not recorded.',{size:9,ink:s?C.ink:C.muted});
       paragraph(`Attempt ID: ${a.id} | Session: ${a.sessionId||'not recorded'}`,{size:7.5,ink:C.muted});
+      const snapshot=scratchImages.get(a.id);
+      if(snapshot){
+        const remaining=bottom-y-60,snapshotHeight=remaining>=240?Math.min(320,remaining):320;
+        heading(`Scratch pad - attempt ${a.number}`,snapshotHeight+22);
+        paragraph(`${a.setLabel} | Saved when this answer was checked: ${stamp(a.answeredAt)}${a.scratchSnapshot.strokes.length?'':' | Blank pad'}`,{size:8,ink:C.muted,gap:4});
+        await picture(snapshot,snapshotHeight);
+      }else paragraph('Scratch-pad snapshot: not recorded for this attempt.',{size:9,ink:C.muted});
     }
   }
 
-  if(scratchPNG||report.notes){
-    addPage('Scratch pad & notes');
-    paragraph('Current work for this concept, captured when the report was generated. This drawing is not a historical snapshot of any individual question or attempt.',{size:9,ink:C.muted});
-    if(scratchPNG){await picture(scratchPNG,440);if(report.scratch?.saved===false)paragraph('Includes work held in this visit that the browser could not save.',{size:9});}
-    else paragraph('No scratch-pad drawing is available.');
-    if(report.notes){heading('Current typed notes');paragraph(report.notes);}
+  if(report.notes){
+    addPage('Current typed notes');
+    paragraph('Current notes for this concept, captured when the report was generated.',{size:9,ink:C.muted});
+    paragraph(report.notes);
   }
   addPage('Concept connections & report scope');
   heading('Skills covered');for(const skill of report.concept.subskills)paragraph(skill,{size:10,gap:6});
@@ -153,14 +161,19 @@ export async function renderConceptReportPDF(report,{PDFLib,fontkit,fonts,images
   if(report.connections.length)table(['Connection','Concept'],[110,CW-110],report.connections.map(e=>[e.direction,`${e.concept.id}  ${e.concept.title}`]));
   else paragraph('No direct prerequisite relationships are listed for this concept.');
   paragraph(`Generated ${stamp(report.generatedAt)}. Scoring policy ${report.policyVersion}. This report includes every saved attempt available for this concept, including earlier question versions. Unsubmitted answers and live camera samples are not included.`,{size:9,ink:C.muted});
-  paragraph(`Scratch pad: ${scratchPNG?'current drawing included':report.scratch?.saved===false?'could not read saved drawing':'no drawing available'}. Notes and drawings are shared across this concept's practice sessions. Camera images, video and audio are not stored or included.`,{size:9,ink:C.muted});
+  paragraph(`Scratch pad: ${scratchImages.size} of ${report.history.length} attempts include a snapshot saved when the answer was checked. Each image preserves the pad at that moment, including blank pads. Later edits do not alter it. Attempts without a snapshot are marked as not recorded; the current drawing is never substituted. Typed notes remain shared across this concept's practice sessions. Camera images, video and audio are not stored or included.`,{size:9,ink:C.muted});
   doc.getPages().forEach((p,i)=>{page=p;line(H-30);text(`${report.concept.id} | Concept practice report`,M,H-22,8,body,C.muted);text(`${i+1} / ${doc.getPageCount()}`,W-M-45,H-22,8,body,C.muted);});
   return doc.save();
 }
 
 export async function createConceptReportPDF(report,mathText){
   const [{reportMathImages},{renderScratch},resources]=await Promise.all([import('./report-math-images.mjs'),import('./scratch-render.mjs'),reportResources()]);
-  const images=await reportMathImages(report.items,mathText);let scratchPNG=null;
-  if(report.scratch?.strokes?.length){const canvas=document.createElement('canvas');renderScratch(canvas,report.scratch.strokes,2000,1400);scratchPNG=canvas.toDataURL('image/png');}
-  return renderConceptReportPDF(report,{...resources,images,scratchPNG});
+  const images=await reportMathImages(report.items,mathText),scratchImages=new Map(),drawings=new Map(),canvas=document.createElement('canvas');
+  for(const a of report.history){
+    if(!a.scratchSnapshot)continue;
+    const key=JSON.stringify(a.scratchSnapshot.strokes);
+    if(!drawings.has(key)){renderScratch(canvas,a.scratchSnapshot.strokes,2000,1400);drawings.set(key,canvas.toDataURL('image/png'));}
+    scratchImages.set(a.id,drawings.get(key));
+  }
+  return renderConceptReportPDF(report,{...resources,images,scratchImages});
 }

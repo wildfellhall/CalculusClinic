@@ -6,6 +6,12 @@ const validPoint=p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)&&p[
 function validStrokes(strokes){
   return Array.isArray(strokes)&&strokes.length<=MAX_STROKES&&strokes.every(s=>s&&(s.tool==='pen'||s.tool==='eraser')&&INKS.includes(s.color)&&Number.isFinite(s.width)&&s.width>=1&&s.width<=80&&Array.isArray(s.points)&&s.points.length>0&&s.points.every(validPoint))&&strokes.reduce((n,s)=>n+s.points.length,0)<=MAX_POINTS;
 }
+// Store the exact drawing operations, including erasing, without retaining a
+// reference to the editable pad. Render this frozen drawing as an image in PDFs.
+export function validateScratchSnapshot(value){
+  if(!value||value.version!==1||!validStrokes(value.strokes))throw new Error('An attempt has an invalid scratch-pad snapshot.');
+  return {version:1,strokes:value.strokes.map(s=>({tool:s.tool,color:s.color,width:s.width,points:s.points.map(p=>[...p])}))};
+}
 export class ScratchData {
   constructor(storage,conceptIds){this.storage=storage;this.ids=new Set(conceptIds);this.pages=new Map();}
   page(id){
@@ -22,6 +28,11 @@ export class ScratchData {
     const page=this.page(id);
     try{if(!page.readable)throw new Error('Unreadable drawing');this.storage.setItem(SCRATCH_PREFIX+id,JSON.stringify({version:1,strokes:page.strokes}));page.saved=true;}
     catch{page.saved=false;}
+  }
+  snapshot(id){
+    const page=this.page(id);
+    if(!page.readable&&!page.strokes.length)return null;
+    return validateScratchSnapshot({version:1,strokes:page.strokes});
   }
   edit(id,strokes){
     if(!validStrokes(strokes))return false;

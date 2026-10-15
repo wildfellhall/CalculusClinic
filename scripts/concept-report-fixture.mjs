@@ -17,5 +17,7 @@ export function conceptReportFixture(){
  attempts.push(make(questions.find(q=>q.conceptId==='F02'),52,false,'qa-factoring',{facialExpression:expression('fearful'),facialMovement:movement.finish(),selfReport:selfReport({emotion:'frustration',intensity:4,valence:'unpleasant'})}),make(questions.find(q=>q.conceptId==='F03'),53,true,'qa-foundation',{facialMovement:movement.finish(),selfReport:selfReport({emotion:'calm',intensity:3,valence:'pleasant'})}));
  attempts.push(make(questions.find(q=>q.conceptId==='MATH_057'),54,true,'qa-algebra-one',{facialExpression:expression('angry')}),make(questions.find(q=>q.conceptId==='MATH_081'),55,true,'qa-algebra-two',{facialExpression:expression('happy')}));
  const scratch={saved:true,strokes:[{tool:'pen',color:'#294637',width:6,points:[[150,200],[250,300]]},{tool:'pen',color:'#294637',width:6,points:[[250,200],[150,300]]},{tool:'pen',color:'#365fa0',width:6,points:[[400,200],[650,200],[650,300],[400,300]]},{tool:'eraser',color:'#294637',width:35,points:[[500,150],[500,250]]}]};
+ for(let i=0;i<10;i++)attempts[i].scratchSnapshot={version:1,strokes:structuredClone(i===1?[]:i===0?scratch.strokes.slice(0,2):i===2?scratch.strokes.slice(2,3):scratch.strokes)};
+ attempts[10].scratchSnapshot={version:1,strokes:structuredClone(scratch.strokes.slice(0,3))};attempts[11].scratchSnapshot={version:1,strokes:structuredClone(scratch.strokes)};
  return {attempts,progressChecks,scratch,notes:'Factor first. Cancel only common factors, then evaluate the limit.'};
 }
